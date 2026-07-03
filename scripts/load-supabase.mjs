@@ -24,7 +24,9 @@ const URL = env("SUPABASE_URL");
 const KEY = env("SUPABASE_ANON_KEY");
 if (!URL || !KEY) { console.error("Missing SUPABASE_URL / SUPABASE_ANON_KEY"); process.exit(1); }
 
-const SEVERITY = { EX: 90, EW: 80, "CR (PE)": 70, CR: 60, EN: 50, VU: 40, NT: 30, "LR/nt": 30, "LR/cd": 35, DD: 20, "LR/lc": 10, LC: 10 };
+// Higher = closer to extinction = shown first. Soonest-to-go living species lead;
+// already-extinct sink to the bottom.
+const SEVERITY = { "CR (PE)": 100, CR: 90, EN: 70, VU: 50, "LR/cd": 32, NT: 30, "LR/nt": 30, LC: 10, "LR/lc": 10, DD: 5, EW: 3, EX: 1 };
 const severityOf = (c) => SEVERITY[c] ?? 5;
 
 function rowFor(r) {

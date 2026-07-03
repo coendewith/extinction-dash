@@ -2,9 +2,37 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { Species } from "@/lib/types";
-import { STATUS, GROUP_ICON, since, ymd } from "@/lib/species";
+import { STATUS, GROUP_ICON, genSpark, since, ymd } from "@/lib/species";
 import type { SpeciesRow } from "@/lib/supabase";
 import COUNTRIES from "@/data/countries.json";
+
+// Per-row trend + illustrative abundance sparkline. Uses the species' measured
+// IUCN population trend when we have it; otherwise an illustrative trajectory
+// from the IUCN category (threatened → declining, LC → stable, extinct → gone),
+// matching how the original watchlist drew its illustrative sparklines.
+const GONE_SPARK = { obs: "3,8 44,14 86,26 128,36 170,41", proj: "170,41 176,42" };
+const FLAT_SPARK = { obs: "3,26 44,25 86,26 128,25 170,26", proj: "170,26 176,26" };
+function trendInfo(cat: string, real: string | null) {
+  const measured = !!real && ["up", "down", "stable"].includes(real);
+  const isGone = cat === "EX" || cat === "EW";
+  const dir = measured
+    ? (real as "up" | "down" | "stable")
+    : isGone
+    ? "gone"
+    : ["CR (PE)", "CR", "EN", "VU", "NT", "LR/nt", "LR/cd"].includes(cat)
+    ? "down"
+    : ["LC", "LR/lc"].includes(cat)
+    ? "stable"
+    : "unknown";
+  const M: Record<string, { icon: string; color: string; label: string; spark: { obs: string; proj: string } }> = {
+    down: { icon: "ph-arrow-down", color: "#c23417", label: "Declining", spark: genSpark("down") },
+    up: { icon: "ph-arrow-up", color: "#4f8a48", label: "Recovering", spark: genSpark("up") },
+    stable: { icon: "ph-arrow-right", color: "#8a8069", label: "Stable", spark: genSpark("stable") },
+    gone: { icon: "ph-x", color: cat === "EW" ? "#4a3f6b" : "#8a8069", label: cat === "EW" ? "Gone (wild)" : "Extinct", spark: GONE_SPARK },
+    unknown: { icon: "ph-minus", color: "#b9ae94", label: "Unknown", spark: FLAT_SPARK },
+  };
+  return { ...M[dir], measured };
+}
 
 const DISPLAY = "'Bricolage Grotesque', sans-serif";
 const SERIF = "'Newsreader', Georgia, serif";
@@ -161,7 +189,7 @@ export default function Explorer({ curated }: { curated: Species[] }) {
     active
       ? { background: "#1b1813", color: "#efe7d6", border: "1px solid #1b1813" }
       : { background: "transparent", color: "#4f4839", border: "1px solid rgba(27,24,19,.22)" };
-  const GRID = "44px minmax(160px,1fr) 128px 150px 80px 30px";
+  const GRID = "40px minmax(150px,1fr) 100px 104px 172px 60px 26px";
 
   const commonName = (r: SpeciesRow) => {
     const w = wiki[r.scientific_name];
@@ -179,12 +207,13 @@ export default function Explorer({ curated }: { curated: Species[] }) {
           <span style={{ fontFamily: MONO, fontWeight: 700, fontSize: 11, letterSpacing: ".2em", color: "#8a8069" }}>THE COMPLETE RED LIST</span>
         </div>
         <h2 style={{ fontFamily: DISPLAY, fontWeight: 700, fontSize: 32, lineHeight: 1.02, letterSpacing: "-.02em", margin: 0 }}>
-          Every animal the IUCN has assessed
+          Ranked by how close to extinction
         </h2>
-        <p style={{ fontFamily: SERIF, fontSize: 16, lineHeight: 1.55, color: "#4f4839", margin: "8px 0 0", maxWidth: "74ch" }}>
-          The full IUCN Red List of animals — searched and filtered live against a database of{" "}
-          <b>{total > 0 ? total.toLocaleString("en-US") : "—"}</b> species{country ? ` recorded in ${(COUNTRIES as { code: string; name: string }[]).find((c) => c.code === country)?.name || country}` : ""}, ranked by extinction
-          risk. Filter by status, group and country. Photos and common names load from Wikipedia; search matches scientific names.
+        <p style={{ fontFamily: SERIF, fontSize: 16, lineHeight: 1.55, color: "#4f4839", margin: "8px 0 0", maxWidth: "76ch" }}>
+          Every animal the IUCN has assessed — <b>{total > 0 ? total.toLocaleString("en-US") : "—"}</b> species
+          {country ? ` recorded in ${(COUNTRIES as { code: string; name: string }[]).find((c) => c.code === country)?.name || country}` : ""}, the
+          soonest-to-vanish first. Each carries a population-trend arrow and an abundance sparkline; already-extinct species sink to the bottom.
+          Filter by status, group and country. Photos and names load from Wikipedia; search matches scientific names.
         </p>
 
         {/* controls */}
@@ -272,12 +301,13 @@ export default function Explorer({ curated }: { curated: Species[] }) {
         {/* table */}
         <div style={{ background: "#f6f0e2", border: "1px solid rgba(27,24,19,.18)", borderRadius: 4, overflow: "hidden", marginTop: 16 }}>
           <div style={{ overflowX: "auto" }}>
-            <div style={{ minWidth: 720 }}>
+            <div style={{ minWidth: 880 }}>
               <div style={{ display: "grid", gridTemplateColumns: GRID, gap: 12, padding: "13px 22px", background: "rgba(27,24,19,.06)", alignItems: "center", borderBottom: "1px solid rgba(27,24,19,.14)" }}>
                 <div style={{ fontFamily: MONO, fontWeight: 700, fontSize: 9.5, letterSpacing: ".1em", color: "#8a8069" }}>#</div>
                 <SortHead label="SPECIES" active={sort === "name"} dir={dir} onClick={() => clickSort("name")} />
                 <div style={{ fontFamily: MONO, fontWeight: 700, fontSize: 9.5, letterSpacing: ".1em", color: "#8a8069" }}>GROUP</div>
-                <SortHead label="IUCN STATUS" active={sort === "severity"} dir={dir} onClick={() => clickSort("severity")} />
+                <SortHead label="RISK" active={sort === "severity"} dir={dir} onClick={() => clickSort("severity")} />
+                <div style={{ fontFamily: MONO, fontWeight: 700, fontSize: 9.5, letterSpacing: ".1em", color: "#8a8069" }}>TREND / ABUNDANCE</div>
                 <SortHead label="ASSESSED" active={sort === "year"} dir={dir} onClick={() => clickSort("year")} />
                 <div />
               </div>
@@ -323,6 +353,22 @@ export default function Explorer({ curated }: { curated: Species[] }) {
                           <span style={{ fontFamily: MONO, fontWeight: 700, fontSize: 10.5, color: "#1b1813" }}>{r.category}</span>
                         </span>
                       </div>
+                      {(() => {
+                        const t = trendInfo(r.category, r.population_trend);
+                        return (
+                          <div style={{ display: "flex", alignItems: "center", gap: 8, minWidth: 0 }}>
+                            <div style={{ display: "flex", alignItems: "center", gap: 4, fontFamily: MONO, fontSize: 10.5, color: t.color, flex: "none", width: 74 }} title={t.measured ? "Measured IUCN population trend" : "Illustrative — by IUCN category"}>
+                              <i className={"ph-bold " + t.icon} style={{ fontSize: 14 }} />
+                              {t.label}
+                              {!t.measured && <span style={{ color: "#b9ae94", fontSize: 12, lineHeight: 1 }} title="illustrative by category">·</span>}
+                            </div>
+                            <svg viewBox="0 0 176 46" style={{ width: "100%", maxWidth: 92, height: 18, display: "block" }}>
+                              <polyline points={t.spark.obs} fill="none" stroke={t.color} strokeWidth={3} strokeLinecap="round" strokeLinejoin="round" opacity={t.measured ? 1 : 0.7} />
+                              <polyline points={t.spark.proj} fill="none" stroke={t.color} strokeWidth={2.5} strokeDasharray="3 3" opacity={0.5} strokeLinecap="round" />
+                            </svg>
+                          </div>
+                        );
+                      })()}
                       <div style={{ fontFamily: MONO, fontSize: 12, color: "#4f4839" }}>{r.year_published || "—"}</div>
                       <div style={{ display: "flex", justifyContent: "center" }}>
                         <i className={expandedRow ? "ph ph-caret-up" : "ph ph-caret-down"} style={{ fontSize: 16, color: "#8a8069" }} />
@@ -356,7 +402,7 @@ export default function Explorer({ curated }: { curated: Species[] }) {
           </div>
         </div>
         <div style={{ fontFamily: MONO, fontSize: 10.5, letterSpacing: ".02em", color: "#8a8069", marginTop: 12 }}>
-          CLICK ANY ROW FOR DETAIL / SORT BY COLUMN / DATA: IUCN RED LIST v4 · PHOTOS &amp; NAMES: WIKIPEDIA
+          CLICK ANY ROW FOR DETAIL / SORT BY COLUMN / TREND SHOWS MEASURED IUCN DIRECTION WHERE KNOWN, ELSE ILLUSTRATIVE (·) BY CATEGORY / DATA: IUCN RED LIST v4 · WIKIPEDIA
         </div>
       </div>
     </section>
@@ -416,6 +462,25 @@ function Detail({ r, wiki, curated, now }: { r: SpeciesRow; wiki?: WikiInfo; cur
             <Fact label="IUCN STATUS">{st.full}</Fact>
             <Fact label="GROUP">{r.group_name}</Fact>
             <Fact label="ASSESSED">{r.year_published || "—"}</Fact>
+            {(() => {
+              const t = trendInfo(r.category, r.population_trend);
+              return (
+                <div>
+                  <div style={{ fontFamily: MONO, fontWeight: 700, fontSize: 9.5, letterSpacing: ".1em", color: "#8a8069" }}>
+                    POPULATION TREND {t.measured ? "" : "(illustrative)"}
+                  </div>
+                  <div style={{ display: "flex", alignItems: "center", gap: 10, marginTop: 4 }}>
+                    <span style={{ display: "inline-flex", alignItems: "center", gap: 5, fontFamily: SERIF, fontSize: 15, color: t.color }}>
+                      <i className={"ph-bold " + t.icon} style={{ fontSize: 15 }} />{t.label}
+                    </span>
+                    <svg viewBox="0 0 176 46" style={{ width: 90, height: 22, display: "block" }}>
+                      <polyline points={t.spark.obs} fill="none" stroke={t.color} strokeWidth={3} strokeLinecap="round" strokeLinejoin="round" opacity={t.measured ? 1 : 0.7} />
+                      <polyline points={t.spark.proj} fill="none" stroke={t.color} strokeWidth={2.5} strokeDasharray="3 3" opacity={0.5} />
+                    </svg>
+                  </div>
+                </div>
+              );
+            })()}
             {curated?.region && <Fact label="REGION">{curated.region}</Fact>}
             {curated?.pop && <Fact label="EST. WILD POPULATION">{curated.pop}</Fact>}
             {curated?.lastSeen && (

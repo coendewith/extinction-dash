@@ -13,6 +13,7 @@ export interface SpeciesRow {
   category: string;
   severity: number;
   possibly_extinct: boolean;
+  population_trend: string | null;
   year_published: number | null;
   url: string | null;
 }
@@ -50,7 +51,7 @@ export async function searchSpecies(p: SearchParams): Promise<SearchResult> {
   const country = (p.country || "").trim().toUpperCase();
   // When a country is selected, inner-join the occurrence table so only species
   // recorded in that country come back.
-  const select = "sis_id,scientific_name,common_name,group_name,category,severity,possibly_extinct,year_published,url" +
+  const select = "sis_id,scientific_name,common_name,group_name,category,severity,possibly_extinct,population_trend,year_published,url" +
     (country ? ",species_countries!inner(country_code)" : "");
   params.set("select", select);
   if (country && /^[A-Z]{2}$/.test(country)) params.set("species_countries.country_code", "eq." + country);
