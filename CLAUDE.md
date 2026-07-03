@@ -128,7 +128,9 @@ after any substantial change.
 
 ## Deployment
 
-- GitHub: `coendewith/extinction-dash`. Vercel team: `coendewiths-projects`.
+- **Live:** https://extinction-dash.vercel.app
+- GitHub: `coendewith/extinction-dash` (auto-deploys on push to `main`).
+  Vercel team: `coendewiths-projects`.
 - **Set `IUCN_TOKEN` in Vercel project env vars** (Production + Preview). Without
   it the site still works but serves the build-time snapshot (badge shows SNAPSHOT).
 - `data/` raw sources (CSV/zip/pdf) are gitignored; the generated `src/data/*.json`

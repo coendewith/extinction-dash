@@ -5,7 +5,7 @@ global wildlife-abundance trends and biomass scale — with **measured facts kep
 visually separate from modelled projections** (solid vs dashed), and no fake
 "days until extinction" countdown.
 
-**Live:** deployed on Vercel · **Design:** ported from a Claude Design mockup.
+**Live:** [extinction-dash.vercel.app](https://extinction-dash.vercel.app) · **Design:** ported from a Claude Design mockup.
 
 ## Sections
 
