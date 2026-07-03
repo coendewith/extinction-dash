@@ -37,6 +37,50 @@ function trendInfo(cat: string, real: string | null) {
   return { ...M[dir], measured };
 }
 
+// Indicative extinction-risk window from the IUCN category, tightened by the
+// measured population trend and (where known) population size. This is MODELLED
+// from the Red List category's Criterion E risk horizon — not a per-species
+// population model — so it is always shown as a range, never a single fabricated
+// date and never a days-left counter. Curated species override this with their
+// published Criterion E windows. Categories below VU / DD get no window.
+const NOW_YEAR = 2026;
+const RISK_BASE: Record<string, [number, number]> = {
+  "CR (PE)": [0, 12], // possibly extinct already
+  CR: [8, 55],
+  EN: [25, 95],
+  VU: [60, 150],
+};
+function popNumber(s: string | null | undefined): number | null {
+  if (!s) return null;
+  const m = s.replace(/,/g, "").match(/\d+(\.\d+)?/);
+  return m ? parseFloat(m[0]) : null;
+}
+type Projection =
+  | { kind: "window"; lo: number; hi: number; mid: number; label: string; sub: string; color: string; beyond: boolean }
+  | { kind: "extinct"; label: string; sub: string; color: string }
+  | { kind: "ew"; label: string; sub: string; color: string }
+  | { kind: "none"; label: string; sub: string; color: string };
+function projectionFor(cat: string, trend: string | null, popSize: string | null | undefined): Projection {
+  if (cat === "EX") return { kind: "extinct", label: "Extinct", sub: "confirmed", color: "#8a8069" };
+  if (cat === "EW") return { kind: "ew", label: "Extinct in wild", sub: "no wild population", color: "#4a3f6b" };
+  const base = RISK_BASE[cat];
+  if (!base) return { kind: "none", label: "—", sub: cat === "DD" ? "data deficient" : "lower risk", color: "#b9ae94" };
+  let m = trend === "down" ? 0.72 : trend === "up" ? 1.6 : trend === "unknown" ? 1.15 : 1.0;
+  const n = popNumber(popSize);
+  if (n != null && n > 0) {
+    if (n < 50) m *= 0.5;
+    else if (n < 250) m *= 0.68;
+    else if (n < 1000) m *= 0.82;
+    else if (n >= 1_000_000) m *= 1.3;
+  }
+  const lo = Math.max(NOW_YEAR, NOW_YEAR + Math.round(base[0] * m));
+  const hi = NOW_YEAR + Math.round(base[1] * m);
+  const mid = Math.round((lo + hi) / 2);
+  const beyond = hi > 2130;
+  const color = cat === "CR (PE)" || cat === "CR" ? "#c23417" : cat === "EN" ? "#cf8f34" : "#8a8069";
+  return { kind: "window", lo, hi, mid, label: "≈" + mid, sub: beyond ? `${lo}–2130+` : `${lo}–${hi}`, color, beyond };
+}
+
 const DISPLAY = "'Bricolage Grotesque', sans-serif";
 const SERIF = "'Newsreader', Georgia, serif";
 const MONO = "'Space Mono', monospace";
@@ -194,7 +238,7 @@ export default function Explorer({ curated }: { curated: Species[] }) {
     active
       ? { background: "#1b1813", color: "#efe7d6", border: "1px solid #1b1813" }
       : { background: "transparent", color: "#4f4839", border: "1px solid rgba(27,24,19,.22)" };
-  const GRID = "40px minmax(150px,1fr) 100px 104px 172px 60px 26px";
+  const GRID = "34px minmax(128px,1fr) 74px 76px 120px 148px 44px 22px";
 
   const commonName = (r: SpeciesRow) => {
     const w = wiki[r.scientific_name];
@@ -332,6 +376,7 @@ export default function Explorer({ curated }: { curated: Species[] }) {
                 <SortHead label="SPECIES" active={sort === "name"} dir={dir} onClick={() => clickSort("name")} />
                 <div style={{ fontFamily: MONO, fontWeight: 700, fontSize: 9.5, letterSpacing: ".1em", color: "#8a8069" }}>GROUP</div>
                 <SortHead label="RISK" active={sort === "severity"} dir={dir} onClick={() => clickSort("severity")} />
+                <div style={{ fontFamily: MONO, fontWeight: 700, fontSize: 9.5, letterSpacing: ".1em", color: "#8a8069" }} title="Modelled risk window from IUCN category + trend. Ranked by RISK.">EST. EXTINCTION</div>
                 <div style={{ fontFamily: MONO, fontWeight: 700, fontSize: 9.5, letterSpacing: ".1em", color: "#8a8069" }}>TREND / ABUNDANCE</div>
                 <SortHead label="ASSESSED" active={sort === "year"} dir={dir} onClick={() => clickSort("year")} />
                 <div />
@@ -378,6 +423,33 @@ export default function Explorer({ curated }: { curated: Species[] }) {
                           <span style={{ fontFamily: MONO, fontWeight: 700, fontSize: 10.5, color: "#1b1813" }}>{r.category}</span>
                         </span>
                       </div>
+                      {(() => {
+                        const cur = curatedBySis.get(r.sis_id);
+                        if (cur?.kind === "window" && cur.win) {
+                          const mid = Math.round((cur.win[0] + cur.win[1]) / 2);
+                          return (
+                            <div title="Curated Criterion E projected window">
+                              <div style={{ fontFamily: MONO, fontWeight: 700, fontSize: 13, color: "#c23417" }}>≈{mid}</div>
+                              <div style={{ fontFamily: MONO, fontSize: 9, color: "#8a8069" }}>{cur.win[0]}–{cur.win[1]}</div>
+                            </div>
+                          );
+                        }
+                        const p = projectionFor(r.category, r.population_trend, r.population_size);
+                        if (p.kind === "window") {
+                          return (
+                            <div title="Modelled risk window — from IUCN category + trend (indicative range)">
+                              <div style={{ fontFamily: MONO, fontWeight: 700, fontSize: 13, color: p.color }}>{p.label}</div>
+                              <div style={{ fontFamily: MONO, fontSize: 9, color: "#8a8069" }}>{p.sub}</div>
+                            </div>
+                          );
+                        }
+                        return (
+                          <div>
+                            <div style={{ fontFamily: MONO, fontWeight: 700, fontSize: 11.5, color: p.color }}>{p.label === "—" ? "—" : p.label}</div>
+                            <div style={{ fontFamily: MONO, fontSize: 9, color: "#8a8069" }}>{p.sub}</div>
+                          </div>
+                        );
+                      })()}
                       {(() => {
                         const t = trendInfo(r.category, r.population_trend);
                         return (
@@ -427,7 +499,7 @@ export default function Explorer({ curated }: { curated: Species[] }) {
           </div>
         </div>
         <div style={{ fontFamily: MONO, fontSize: 10.5, letterSpacing: ".02em", color: "#8a8069", marginTop: 12 }}>
-          CLICK ANY ROW FOR DETAIL / SORT BY COLUMN / TREND SHOWS MEASURED IUCN DIRECTION WHERE KNOWN, ELSE ILLUSTRATIVE (·) BY CATEGORY / DATA: IUCN RED LIST v4 · WIKIPEDIA
+          CLICK ANY ROW FOR DETAIL / EST. EXTINCTION IS A MODELLED RISK WINDOW FROM IUCN CATEGORY + TREND (A RANGE, NOT A DATED PREDICTION) / CURATED SPECIES USE PUBLISHED CRITERION E WINDOWS / TREND IS MEASURED WHERE KNOWN, ELSE ILLUSTRATIVE (·) / DATA: IUCN RED LIST v4 · WIKIPEDIA
         </div>
       </div>
     </section>
@@ -528,11 +600,32 @@ function Detail({ r, wiki, curated, now }: { r: SpeciesRow; wiki?: WikiInfo; cur
               <p style={{ fontFamily: SERIF, fontSize: 14, lineHeight: 1.55, color: "#4f4839", margin: "4px 0 0", maxWidth: "72ch" }}>{r.population_summary}</p>
             </div>
           )}
-          {!curated && (r.category === "CR" || r.category === "CR (PE)" || r.category === "EW") && (
-            <div style={{ fontFamily: SERIF, fontSize: 13, lineHeight: 1.5, color: "#8a8069", margin: "0 0 12px", maxWidth: "72ch" }}>
-              No dated extinction projection is published for this species — IUCN gives a category and trend, not a year. Ranking here reflects Red List status; the curated watchlist adds modelled windows where they exist.
-            </div>
-          )}
+          {!curated && (() => {
+            const p = projectionFor(r.category, r.population_trend, r.population_size);
+            const measured = !!r.population_trend;
+            if (p.kind === "window") {
+              return (
+                <div style={{ marginBottom: 12 }}>
+                  <div style={{ display: "inline-block", background: "#16221b", borderRadius: 4, padding: "12px 16px", color: "#ece3d0" }}>
+                    <div style={{ fontFamily: MONO, fontWeight: 700, fontSize: 9.5, letterSpacing: ".12em", color: "#e3a63e" }}>MODELLED / RISK WINDOW</div>
+                    <div style={{ fontFamily: DISPLAY, fontWeight: 700, fontSize: 22, marginTop: 2 }}>{p.lo}&ndash;{p.beyond ? "2130+" : p.hi}</div>
+                    <div style={{ fontFamily: SERIF, fontSize: 12, color: "rgba(236,227,208,.62)", marginTop: 2, maxWidth: "42ch" }}>
+                      Indicative horizon from the {st.full} risk category{measured ? " and measured trend" : ""} &mdash; not a dated per-species projection.
+                    </div>
+                  </div>
+                </div>
+              );
+            }
+            if (p.kind === "extinct" || p.kind === "ew") {
+              return (
+                <div style={{ display: "inline-block", background: "#16221b", borderRadius: 4, padding: "12px 16px", color: "#ece3d0", marginBottom: 12 }}>
+                  <div style={{ fontFamily: MONO, fontWeight: 700, fontSize: 9.5, letterSpacing: ".12em", color: "#8a8069" }}>STATUS</div>
+                  <div style={{ fontFamily: DISPLAY, fontWeight: 700, fontSize: 20, marginTop: 2 }}>{p.label}</div>
+                </div>
+              );
+            }
+            return null;
+          })()}
           {wiki?.extract && (
             <p style={{ fontFamily: SERIF, fontSize: 14.5, lineHeight: 1.6, color: "#4f4839", margin: 0, maxWidth: "70ch" }}>{wiki.extract}</p>
           )}

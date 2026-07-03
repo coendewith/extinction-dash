@@ -18,6 +18,31 @@ const NAV_LINKS = [
   ["#sources", "Sources"],
 ] as const;
 
+// Per-group drivers behind the measured 1970–2020 trajectories in the LPI chart.
+// Change % is vs the 1970=100 baseline (from src/data/lpi.json, observed to 2020).
+const LPI_DRIVERS = [
+  {
+    group: "Amphibians", color: "#f04a26", change: "−82% since 1970", dirColor: "#f04a26",
+    text: "The steepest fall of any vertebrate class. Chytrid fungus (Batrachochytrium) has swept the tropics since the 1980s, on top of wetland drainage, agrochemical pollution and a drying climate.",
+  },
+  {
+    group: "Fish", color: "#37a99d", change: "−21% since 1970", dirColor: "#f04a26",
+    text: "Driven down by overfishing, dams that sever migratory rivers, and bycatch. The recent uptick is well-managed temperate stocks rebounding — freshwater and tropical fish keep falling.",
+  },
+  {
+    group: "Mammals", color: "#e3a63e", change: "−36% since 1970", dirColor: "#f04a26",
+    text: "Habitat cleared for farming, plus hunting and the wildlife trade. Large-bodied mammals and populations outside protected areas have been hit hardest.",
+  },
+  {
+    group: "Birds", color: "#e8ddc4", change: "≈ flat", dirColor: "#b9ae94",
+    text: "Near-flat only because the index leans on well-monitored, often protected temperate species. Farmland birds and long-distance migrants are declining sharply beneath the average.",
+  },
+  {
+    group: "Reptiles", color: "#79bd6e", change: "+39% (sample artifact)", dirColor: "#cf8f34",
+    text: "The rise reflects a small, well-studied sample (809 populations) skewed toward recovering species like protected marine turtles. Globally, reptiles face habitat loss, climate change and the pet & skin trade.",
+  },
+];
+
 export default function Dashboard({
   initialSpecies,
   lpi,
@@ -404,6 +429,28 @@ export default function Dashboard({
               </div>
             ))}
           </div>
+
+          {/* what's driving each group's trend */}
+          <div style={{ marginTop: 22, background: "#16221b", border: "1px solid rgba(236,227,208,.12)", borderRadius: 4, padding: "20px 22px" }}>
+            <div style={{ fontFamily: MONO, fontWeight: 700, fontSize: 11, letterSpacing: ".14em", color: "rgba(236,227,208,.6)", marginBottom: 4 }}>WHAT&rsquo;S DRIVING EACH LINE</div>
+            <div style={{ fontFamily: SERIF, fontSize: 13.5, color: "rgba(236,227,208,.55)", marginBottom: 16, maxWidth: "82ch" }}>
+              Measured change over 1970&ndash;2020 in this unweighted index. Where a line rises, it reflects the index over-sampling well-monitored temperate populations &mdash; not a global recovery. Projections are held flat-to-declining; recovery is never extrapolated.
+            </div>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(310px,1fr))", gap: "14px 26px" }}>
+              {LPI_DRIVERS.map((d) => (
+                <div key={d.group} style={{ display: "flex", gap: 11, alignItems: "flex-start" }}>
+                  <span style={{ width: 14, height: 3, background: d.color, flex: "none", marginTop: 8, borderRadius: 2 }} />
+                  <div>
+                    <div style={{ display: "flex", alignItems: "baseline", gap: 8, flexWrap: "wrap" }}>
+                      <span style={{ fontFamily: DISPLAY, fontWeight: 700, fontSize: 15, color: "#ece3d0" }}>{d.group}</span>
+                      <span style={{ fontFamily: MONO, fontWeight: 700, fontSize: 11, color: d.dirColor }}>{d.change}</span>
+                    </div>
+                    <div style={{ fontFamily: SERIF, fontSize: 13.5, lineHeight: 1.5, color: "rgba(236,227,208,.72)", marginTop: 2 }}>{d.text}</div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
         </div>
       </section>
 
@@ -458,7 +505,10 @@ export default function Dashboard({
                   <div style={{ flex: 1, height: 26, background: "rgba(236,227,208,.07)", position: "relative" }}>
                     <div style={{ height: "100%", width: b.widthCss, background: b.color, minWidth: 3 }} />
                   </div>
-                  <div style={{ width: 88, flex: "none", fontFamily: MONO, fontSize: 12, color: "#ece3d0", textAlign: "right" }}>{b.valueLabel}</div>
+                  <div style={{ width: 96, flex: "none", textAlign: "right" }}>
+                    <div style={{ fontFamily: MONO, fontSize: 12, color: "#ece3d0" }}>{b.valueLabel}</div>
+                    {b.relLabel ? <div style={{ fontFamily: MONO, fontSize: 10, color: "rgba(236,227,208,.5)", marginTop: 2 }}>{b.relLabel}</div> : null}
+                  </div>
                 </div>
               ))}
             </div>
@@ -480,14 +530,21 @@ export default function Dashboard({
                     <span style={{ fontFamily: MONO, fontWeight: 700, fontSize: 11, letterSpacing: ".1em", color: "rgba(236,227,208,.7)" }}>{c.label}</span>
                     <span style={{ fontFamily: SERIF, fontSize: 13, color: "rgba(236,227,208,.55)" }}>{c.unit}</span>
                   </div>
-                  <div style={{ display: "flex", height: 38, overflow: "hidden", borderRadius: 2 }}>
-                    <div style={{ width: c.bigPct + "%", background: c.bigColor, display: "flex", alignItems: "center", padding: "0 12px", fontFamily: DISPLAY, fontWeight: 700, fontSize: 15, color: "#1b1813", whiteSpace: "nowrap", overflow: "hidden" }}>{c.big}</div>
-                    <div style={{ width: c.wildPct + "%", background: c.wildColor, display: "flex", alignItems: "center", justifyContent: "flex-end", padding: "0 10px", fontFamily: MONO, fontWeight: 700, fontSize: 12, color: "#1b1813" }}>{c.rightInBar}</div>
+                  <div style={{ display: "flex", height: 38, overflow: "hidden", borderRadius: 2, gap: 1 }}>
+                    {c.segments.map((s) => (
+                      <div key={s.label} title={`${s.label} · ${s.pct}%`} style={{ width: s.pct + "%", background: s.color, display: "flex", alignItems: "center", padding: "0 9px", fontFamily: DISPLAY, fontWeight: 700, fontSize: 13, color: "#1b1813", whiteSpace: "nowrap", overflow: "hidden", minWidth: 2 }}>
+                        {s.pct >= 14 ? s.label : ""}
+                      </div>
+                    ))}
                   </div>
-                  <div style={{ display: "flex", justifyContent: "space-between", marginTop: 6, fontFamily: MONO, fontSize: 10, letterSpacing: ".04em", color: "rgba(236,227,208,.6)" }}>
-                    <span>{c.left}</span>
-                    <span style={{ color: c.wildColor }}>{c.right}</span>
+                  <div style={{ display: "flex", flexWrap: "wrap", gap: "4px 14px", marginTop: 7 }}>
+                    {c.segments.map((s) => (
+                      <span key={s.label} style={{ display: "inline-flex", alignItems: "center", gap: 5, fontFamily: MONO, fontSize: 10, letterSpacing: ".03em", color: "rgba(236,227,208,.62)" }}>
+                        <span style={{ width: 9, height: 9, background: s.color, display: "inline-block", flex: "none" }} />{s.label} {s.pct}%
+                      </span>
+                    ))}
                   </div>
+                  <div style={{ fontFamily: SERIF, fontSize: 12.5, lineHeight: 1.45, color: "rgba(236,227,208,.5)", marginTop: 6 }}>{c.caption}</div>
                 </div>
               ))}
             </div>

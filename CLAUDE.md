@@ -188,11 +188,22 @@ Full refresh: `npm run harvest && npm run load` (species), then
   a one-sentence `population_summary`. ~30 min at concurrency 3. Widen tiers via
   args (`node scripts/enrich-trend.mjs EN VU`). 88k full enrichment is infeasible
   (~hours) — that's why only the top of the ranking is enriched.
-- **What IUCN does NOT provide structurally** (so we do NOT show it for the full
-  dataset, only for the curated 24): last-sighting date, projected extinction date,
-  recovery date. These were hand-authored editorial windows. For the full list the
-  honest signal is category + trend + population; the detail panel says so. Never
-  fabricate a per-species extinction year (the design's "no fake days-left" ethos).
+- **EST. EXTINCTION column (modelled risk window).** Every threatened row shows an
+  indicative extinction-risk window derived from the IUCN **category's Criterion E
+  risk horizon**, tightened by measured `population_trend` and (where known)
+  `population_size`. `projectionFor()` in Explorer.tsx: base years-from-now per
+  category (CR (PE) 0–12, CR 8–55, EN 25–95, VU 60–150), × a trend multiplier
+  (down 0.72 / stable 1.0 / unknown 1.15 / up 1.6) × a small-population multiplier
+  (<50 → 0.5 … ≥1M → 1.3). ALWAYS a range (`≈mid (lo–hi)`), NEVER a single
+  fabricated date and NEVER a days-left counter — that honours the design's ethos
+  while giving the feature the user wanted "for most" species. Curated 24 override
+  with their **published** Criterion E windows. NT/LC/DD get no window; EX/EW show
+  status. The window tracks category, so the server-side `severity` sort already
+  orders by it (no separate client sort needed).
+- **What IUCN still does NOT provide structurally** (curated-24 only): last-sighting
+  date and a *dated* per-species projection. Those stay editorial; the full-dataset
+  window is explicitly labelled "modelled from category + trend," not a per-species
+  population model.
 - **Loading enriched data / countries** needs writes, but the table is public-read
   RLS with NO write policy in production. Load via a brief temp-policy window
   (add `temp bulk load`/`temp bulk update` → run loader → drop), always dropping

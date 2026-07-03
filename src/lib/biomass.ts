@@ -42,50 +42,51 @@ const MAMMALS: BiomassRow[] = [
 export function biomassRows(view: BiomassView) {
   const rows = view === "All life on Earth" ? ALL_LIFE : view === "Mammals only" ? MAMMALS : ANIMALS;
   const max = Math.max(...rows.map((r) => r.v));
+  const min = Math.min(...rows.map((r) => r.v));
+  // For the Mammals cut, show each bar relative to wild mammals (the baseline) —
+  // that multiple ("9× wild") is far more legible than the raw 0.06 vs 0.007 Gt C.
+  const showRel = view === "Mammals only";
   return rows.map((r) => ({
     label: r.label,
     color: r.color,
     widthCss: Math.max(0.7, (r.v / max) * 100).toFixed(2) + "%",
     valueLabel: (r.v >= 1 ? r.v.toFixed(0) : r.v.toFixed(3)) + " Gt C",
+    relLabel: showRel ? (r.v / min >= 1.5 ? `${Math.round(r.v / min)}× wild` : "baseline") : "",
   }));
 }
 
 export const composition = [
   {
+    // Mammal total ≈ 0.167 Gt C: cattle .06, humans .06, other livestock .04, wild .007
     label: "MAMMAL BIOMASS",
-    unit: "by mass",
-    big: "96% us + livestock",
-    bigPct: 96,
-    wildPct: 4,
-    bigColor: "#f04a26",
-    wildColor: "#79bd6e",
-    left: "HUMANS + DOMESTICATED LIVESTOCK",
-    right: "WILD 4%",
-    rightInBar: "",
+    unit: "by mass · Gt C",
+    caption: "Cattle, humans and other livestock are ~96% of mammal biomass. Wild mammals: ~4%.",
+    segments: [
+      { label: "Cattle", pct: 36, color: "#f04a26" },
+      { label: "Humans", pct: 36, color: "#e3a63e" },
+      { label: "Pigs & other livestock", pct: 24, color: "#cf8f34" },
+      { label: "Wild mammals", pct: 4, color: "#79bd6e" },
+    ],
   },
   {
-    label: "ALL BIRDS",
-    unit: "by mass",
-    big: "70% poultry",
-    bigPct: 70,
-    wildPct: 30,
-    bigColor: "#e3a63e",
-    wildColor: "#79bd6e",
-    left: "DOMESTICATED POULTRY, MOSTLY CHICKENS",
-    right: "WILD BIRDS",
-    rightInBar: "30%",
+    // Poultry ~0.005 vs wild birds ~0.002 Gt C
+    label: "BIRD BIOMASS",
+    unit: "by mass · Gt C",
+    caption: "Domesticated poultry (mostly chickens) outweigh all wild birds ~7 to 3.",
+    segments: [
+      { label: "Poultry", pct: 70, color: "#e3a63e" },
+      { label: "Wild birds", pct: 30, color: "#79bd6e" },
+    ],
   },
   {
+    // Plants 450 vs animals 2 Gt C
     label: "PLANTS vs ANIMALS",
-    unit: "all life, by mass",
-    big: "Plants ≈ 225× all animals",
-    bigPct: 99.5,
-    wildPct: 0.5,
-    bigColor: "#79bd6e",
-    wildColor: "#f04a26",
-    left: "PLANTS · 450 Gt C",
-    right: "ANIMALS · 2 Gt C",
-    rightInBar: "",
+    unit: "all life · by mass",
+    caption: "Plants (450 Gt C) are ~225× the biomass of all animals combined (2 Gt C).",
+    segments: [
+      { label: "Plants", pct: 99.5, color: "#79bd6e" },
+      { label: "Animals", pct: 0.5, color: "#f04a26" },
+    ],
   },
 ];
 

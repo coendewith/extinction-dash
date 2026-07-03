@@ -162,11 +162,15 @@ def main():
             if nsp_by_year.get(y, 0) >= MIN_SPECIES:
                 data_end = y
 
-        # near-term projection from the observed end: recent log-rate, damped and
-        # tightly capped — extrapolating unweighted class means far is not defensible.
+        # near-term projection from the observed end, using the long-run (since 2000)
+        # log-rate. We do NOT project recovery: the recent upticks in Fish/Reptiles are
+        # an artifact of the unweighted index over-sampling well-monitored temperate
+        # populations (see method note), so the upside is capped at flat while a gentle
+        # continued decline is allowed. Extrapolating a monitored class mean far is not
+        # defensible either way.
         p0 = 2000 if data_end > 2000 else BASE
         rate = (math.log10(idx[data_end]) - math.log10(idx[p0])) / (data_end - p0) if data_end > p0 else 0.0
-        rate = max(-0.012, min(0.012, rate))  # cap at ~+/-2.8%/yr
+        rate = max(-0.010, min(0.0, rate))  # flat-to-declining only, capped at ~-2.3%/yr
         val = idx[data_end]
         for y in range(data_end + 1, PROJ_END + 1):
             val *= 10 ** rate
