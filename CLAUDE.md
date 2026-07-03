@@ -172,6 +172,32 @@ Full refresh: `npm run harvest && npm run load` (species), then
   subset into the DB is the obvious future improvement (would make common-name
   search work).
 
+### Per-row richness at scale (trend, sparkline, population) & what's NOT available
+
+- The explorer rows show a **population-trend arrow + abundance sparkline** and
+  rank by **closeness to extinction** (severity: CR possibly-extinct = 100 … EX = 1,
+  so soonest-to-vanish leads, already-extinct sinks). Sort headers: RISK (severity),
+  SPECIES (name), ASSESSED (year).
+- **Trend** is measured IUCN `population_trend` where enriched, otherwise an
+  ILLUSTRATIVE trajectory derived from category (threatened→declining, LC→stable,
+  EX/EW→gone, DD→unknown). A `·` after the label marks illustrative. This mirrors
+  the original design's illustrative sparklines. `trendInfo()` in Explorer.tsx.
+- **Enrichment** (`enrich-trend.mjs` → `data/iucn/detail.json` → `load-detail.mjs`):
+  fetches each species' `/assessment/{id}` for the critical tier (CR (PE), CR, EW,
+  EX ≈ 4.9k) and captures real `population_trend`, structured `population_size`, and
+  a one-sentence `population_summary`. ~30 min at concurrency 3. Widen tiers via
+  args (`node scripts/enrich-trend.mjs EN VU`). 88k full enrichment is infeasible
+  (~hours) — that's why only the top of the ranking is enriched.
+- **What IUCN does NOT provide structurally** (so we do NOT show it for the full
+  dataset, only for the curated 24): last-sighting date, projected extinction date,
+  recovery date. These were hand-authored editorial windows. For the full list the
+  honest signal is category + trend + population; the detail panel says so. Never
+  fabricate a per-species extinction year (the design's "no fake days-left" ethos).
+- **Loading enriched data / countries** needs writes, but the table is public-read
+  RLS with NO write policy in production. Load via a brief temp-policy window
+  (add `temp bulk load`/`temp bulk update` → run loader → drop), always dropping
+  before leaving it live. `load-detail.mjs` PATCHes via JSON body (no SQL escaping).
+
 ### Review process note
 Before the public deploy, an adversarial review workflow (4 dimensions ×
 find→verify) surfaced 19 candidates, 9 confirmed and fixed (all above). It

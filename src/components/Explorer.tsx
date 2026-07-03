@@ -483,6 +483,7 @@ function Detail({ r, wiki, curated, now }: { r: SpeciesRow; wiki?: WikiInfo; cur
             })()}
             {curated?.region && <Fact label="REGION">{curated.region}</Fact>}
             {curated?.pop && <Fact label="EST. WILD POPULATION">{curated.pop}</Fact>}
+            {!curated?.pop && r.population_size && <Fact label="POPULATION SIZE">{r.population_size} <span style={{ color: "#8a8069" }}>mature individuals</span></Fact>}
             {curated?.lastSeen && (
               <Fact label="SINCE LAST SIGHTING">
                 {since(curated.lastSeen, now)} ago <span style={{ color: "#8a8069" }}>· {ymd(curated.lastSeen)}</span>
@@ -496,10 +497,21 @@ function Detail({ r, wiki, curated, now }: { r: SpeciesRow; wiki?: WikiInfo; cur
               {curated.conf && <div style={{ fontFamily: SERIF, fontSize: 12, color: "rgba(236,227,208,.62)", marginTop: 2 }}>{curated.conf}</div>}
             </div>
           )}
+          {r.population_summary && (
+            <div style={{ marginBottom: 12 }}>
+              <div style={{ fontFamily: MONO, fontWeight: 700, fontSize: 9.5, letterSpacing: ".1em", color: "#d8391c" }}>IUCN POPULATION NOTE</div>
+              <p style={{ fontFamily: SERIF, fontSize: 14, lineHeight: 1.55, color: "#4f4839", margin: "4px 0 0", maxWidth: "72ch" }}>{r.population_summary}</p>
+            </div>
+          )}
+          {!curated && (r.category === "CR" || r.category === "CR (PE)" || r.category === "EW") && (
+            <div style={{ fontFamily: SERIF, fontSize: 13, lineHeight: 1.5, color: "#8a8069", margin: "0 0 12px", maxWidth: "72ch" }}>
+              No dated extinction projection is published for this species — IUCN gives a category and trend, not a year. Ranking here reflects Red List status; the curated watchlist adds modelled windows where they exist.
+            </div>
+          )}
           {wiki?.extract && (
             <p style={{ fontFamily: SERIF, fontSize: 14.5, lineHeight: 1.6, color: "#4f4839", margin: 0, maxWidth: "70ch" }}>{wiki.extract}</p>
           )}
-          {!wiki?.extract && !curated && (
+          {!wiki?.extract && !curated && !r.population_summary && (
             <p style={{ fontFamily: SERIF, fontSize: 14, lineHeight: 1.6, color: "#8a8069", margin: 0 }}>
               No Wikipedia summary found for <i>{r.scientific_name}</i>. Follow the IUCN link for the full assessment.
             </p>
