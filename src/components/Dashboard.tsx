@@ -32,7 +32,7 @@ export default function Dashboard({
   const [chartOff, setChartOff] = useState<Record<string, boolean>>({});
   const [images, setImages] = useState<Record<string, string>>({});
   const [showProj, setShowProj] = useState(true);
-  const [biomassView, setBiomassView] = useState<BiomassView>("Animals only");
+  const [biomassView, setBiomassView] = useState<BiomassView>("Mammals only");
 
   // ticking clock for the live countdowns
   useEffect(() => {
@@ -418,7 +418,7 @@ export default function Dashboard({
             <span style={{ width: 34, height: 1, background: "rgba(236,227,208,.3)" }} />
             <span style={{ fontFamily: MONO, fontWeight: 700, fontSize: 11, letterSpacing: ".2em", color: "rgba(236,227,208,.6)" }}>SCALE / BAR-ON 2018</span>
             <div style={{ marginLeft: "auto", display: "flex", gap: 6 }}>
-              {(["Animals only", "All life on Earth"] as BiomassView[]).map((v) => (
+              {(["Mammals only", "Animals only", "All life on Earth"] as BiomassView[]).map((v) => (
                 <button
                   key={v}
                   onClick={() => setBiomassView(v)}

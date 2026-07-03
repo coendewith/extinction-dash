@@ -2,7 +2,7 @@
 // "The biomass distribution on Earth", PNAS. Table 1 / Fig. 1.
 // https://www.pnas.org/doi/10.1073/pnas.1711842115
 
-export type BiomassView = "Animals only" | "All life on Earth";
+export type BiomassView = "Mammals only" | "Animals only" | "All life on Earth";
 
 interface BiomassRow {
   label: string;
@@ -29,8 +29,16 @@ const ALL_LIFE: BiomassRow[] = [
   { label: "Animals (all)", v: 2, color: "#f04a26" },
 ];
 
+// Mammals by biomass — the starkest cut. Livestock (cattle + pigs) and humans
+// dwarf everything wild. Wild mammals are ~4% of mammal biomass.
+const MAMMALS: BiomassRow[] = [
+  { label: "Livestock (cattle, pigs, sheep)", v: 0.1, color: "#f04a26" },
+  { label: "Humans", v: 0.06, color: "#e3a63e" },
+  { label: "Wild mammals", v: 0.007, color: "#79bd6e" },
+];
+
 export function biomassRows(view: BiomassView) {
-  const rows = view === "All life on Earth" ? ALL_LIFE : ANIMALS;
+  const rows = view === "All life on Earth" ? ALL_LIFE : view === "Mammals only" ? MAMMALS : ANIMALS;
   const max = Math.max(...rows.map((r) => r.v));
   return rows.map((r) => ({
     label: r.label,
