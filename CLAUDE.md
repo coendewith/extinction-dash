@@ -198,6 +198,17 @@ Full refresh: `npm run harvest && npm run load` (species), then
   (add `temp bulk load`/`temp bulk update` → run loader → drop), always dropping
   before leaving it live. `load-detail.mjs` PATCHes via JSON body (no SQL escaping).
 
+### "Measured data only" toggle
+
+- Explorer has a **"Measured data only"** toggle, **default ON**. It filters to
+  species with a non-null `population_trend` (`population_trend=not.is.null`) —
+  i.e. the ~4,837 critical-tier species enriched with real IUCN trend + population.
+  Off → all 88,404 (trend illustrative beyond the critical tier).
+- A measured trend of **"unknown"** counts as measured (IUCN assessed it and
+  couldn't determine direction) — `trendInfo()` shows "Unknown", NOT an
+  illustrative "Declining ·". Only a *null* trend falls back to category-derived.
+- Composes with category/group/country filters (e.g. measured + NL = 14 species).
+
 ### Review process note
 Before the public deploy, an adversarial review workflow (4 dimensions ×
 find→verify) surfaced 19 candidates, 9 confirmed and fixed (all above). It
