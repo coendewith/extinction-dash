@@ -1,5 +1,6 @@
-data/
-https:/
+# Anchored to repo root so it does NOT also match src/data/ (which the app imports).
+/data/
+/https:/
 node_modules/
 .next/
 .git/
