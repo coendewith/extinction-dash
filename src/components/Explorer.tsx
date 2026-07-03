@@ -13,10 +13,13 @@ import COUNTRIES from "@/data/countries.json";
 const GONE_SPARK = { obs: "3,8 44,14 86,26 128,36 170,41", proj: "170,41 176,42" };
 const FLAT_SPARK = { obs: "3,26 44,25 86,26 128,25 170,26", proj: "170,26 176,26" };
 function trendInfo(cat: string, real: string | null) {
-  const measured = !!real && ["up", "down", "stable"].includes(real);
+  // A non-null IUCN trend is "measured" — including a measured "unknown"
+  // (IUCN assessed it and couldn't determine direction). Only fall back to an
+  // illustrative category-derived trajectory when we have no measured value.
+  const measured = !!real && ["up", "down", "stable", "unknown"].includes(real);
   const isGone = cat === "EX" || cat === "EW";
   const dir = measured
-    ? (real as "up" | "down" | "stable")
+    ? (real as "up" | "down" | "stable" | "unknown")
     : isGone
     ? "gone"
     : ["CR (PE)", "CR", "EN", "VU", "NT", "LR/nt", "LR/cd"].includes(cat)
@@ -67,6 +70,7 @@ export default function Explorer({ curated }: { curated: Species[] }) {
   const [cats, setCats] = useState<Set<string>>(new Set());
   const [group, setGroup] = useState<string>("");
   const [country, setCountry] = useState<string>("");
+  const [measured, setMeasured] = useState(true); // default: only species with real IUCN-measured data
   const [sort, setSort] = useState<"severity" | "name" | "year">("severity");
   const [dir, setDir] = useState<"asc" | "desc">("desc");
   const [page, setPage] = useState(1);
@@ -105,7 +109,7 @@ export default function Explorer({ curated }: { curated: Species[] }) {
   // reset to page 1 whenever the query shape changes
   useEffect(() => {
     setPage(1);
-  }, [debouncedQ, cats, group, country, sort, dir]);
+  }, [debouncedQ, cats, group, country, measured, sort, dir]);
 
   // fetch results
   useEffect(() => {
@@ -116,6 +120,7 @@ export default function Explorer({ curated }: { curated: Species[] }) {
     if (cats.size) params.set("category", [...cats].join(","));
     if (group) params.set("group", group);
     if (country) params.set("country", country);
+    if (measured) params.set("measured", "1");
     params.set("sort", sort);
     params.set("dir", dir);
     params.set("page", String(page));
@@ -136,7 +141,7 @@ export default function Explorer({ curated }: { curated: Species[] }) {
     return () => {
       cancelled = true;
     };
-  }, [debouncedQ, cats, group, country, sort, dir, page]);
+  }, [debouncedQ, cats, group, country, measured, sort, dir, page]);
 
   // lazy Wikipedia enrichment for the visible rows (image + common name + extract)
   useEffect(() => {
@@ -209,11 +214,23 @@ export default function Explorer({ curated }: { curated: Species[] }) {
         <h2 style={{ fontFamily: DISPLAY, fontWeight: 700, fontSize: 32, lineHeight: 1.02, letterSpacing: "-.02em", margin: 0 }}>
           Ranked by how close to extinction
         </h2>
-        <p style={{ fontFamily: SERIF, fontSize: 16, lineHeight: 1.55, color: "#4f4839", margin: "8px 0 0", maxWidth: "76ch" }}>
-          Every animal the IUCN has assessed — <b>{total > 0 ? total.toLocaleString("en-US") : "—"}</b> species
-          {country ? ` recorded in ${(COUNTRIES as { code: string; name: string }[]).find((c) => c.code === country)?.name || country}` : ""}, the
-          soonest-to-vanish first. Each carries a population-trend arrow and an abundance sparkline; already-extinct species sink to the bottom.
-          Filter by status, group and country. Photos and names load from Wikipedia; search matches scientific names.
+        <p style={{ fontFamily: SERIF, fontSize: 16, lineHeight: 1.55, color: "#4f4839", margin: "8px 0 0", maxWidth: "78ch" }}>
+          {measured ? (
+            <>
+              Showing the <b>{total > 0 ? total.toLocaleString("en-US") : "—"}</b> most-imperilled species
+              {country ? ` in ${(COUNTRIES as { code: string; name: string }[]).find((c) => c.code === country)?.name || country}` : ""} with{" "}
+              <b>real IUCN-measured</b> population trend &amp; figures — the critical tier. Turn off &ldquo;Measured data only&rdquo; to browse all
+              88,404 assessed animals.
+            </>
+          ) : (
+            <>
+              Every animal the IUCN has assessed — <b>{total > 0 ? total.toLocaleString("en-US") : "—"}</b> species
+              {country ? ` recorded in ${(COUNTRIES as { code: string; name: string }[]).find((c) => c.code === country)?.name || country}` : ""}, the
+              soonest-to-vanish first. Trend beyond the critical tier is illustrative (marked ·).
+            </>
+          )}{" "}
+          Each row carries a population-trend arrow and abundance sparkline; already-extinct species sink to the bottom. Photos and names load from
+          Wikipedia; search matches scientific names.
         </p>
 
         {/* controls */}
@@ -257,6 +274,14 @@ export default function Explorer({ curated }: { curated: Species[] }) {
               </select>
             </div>
           )}
+          <button
+            onClick={() => setMeasured((v) => !v)}
+            title="Show only species enriched with a real IUCN-measured population trend + population figures (the critical tier)"
+            style={{ display: "inline-flex", alignItems: "center", gap: 7, fontFamily: MONO, fontSize: 11, letterSpacing: ".04em", textTransform: "uppercase", padding: "8px 13px", borderRadius: 2, cursor: "pointer", background: measured ? "#2c8a80" : "transparent", color: measured ? "#f2ece0" : "#4f4839", border: measured ? "1px solid #2c8a80" : "1px solid rgba(27,24,19,.22)" }}
+          >
+            <i className={measured ? "ph-fill ph-check-circle" : "ph ph-circle"} style={{ fontSize: 14 }} />
+            Measured data only
+          </button>
           <span style={{ marginLeft: "auto", fontFamily: MONO, fontSize: 11.5, color: "#8a8069" }}>
             {loading ? "loading…" : `${total.toLocaleString("en-US")} species`}
           </span>

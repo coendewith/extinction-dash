@@ -25,6 +25,7 @@ export interface SearchParams {
   categories?: string[];
   groups?: string[];
   country?: string;
+  measured?: boolean;
   sort?: "severity" | "name" | "year";
   dir?: "asc" | "desc";
   page?: number;
@@ -60,6 +61,9 @@ export async function searchSpecies(p: SearchParams): Promise<SearchResult> {
 
   if (p.categories?.length) params.set("category", "in." + inList(p.categories));
   if (p.groups?.length) params.set("group_name", "in." + inList(p.groups));
+  // "Measured data only": species enriched with a real IUCN population trend
+  // (the critical tier — CR/possibly-extinct/EW/EX).
+  if (p.measured) params.set("population_trend", "not.is.null");
   const q = (p.q || "").trim();
   if (q) {
     const safe = q.replace(/[(),*]/g, " ").trim();
