@@ -447,7 +447,7 @@ export default function Dashboard({
               </p>
               <div style={{ marginTop: 20, padding: "16px 18px", background: "rgba(240,74,38,.14)", borderLeft: "3px solid #f04a26" }}>
                 <div style={{ fontFamily: DISPLAY, fontWeight: 700, fontSize: 18, lineHeight: 1.28 }}>Livestock and humans are ~96% of all mammal biomass on Earth.</div>
-                <div style={{ fontFamily: SERIF, fontSize: 13.5, color: "rgba(236,227,208,.7)", marginTop: 5 }}>Wild mammals are about 4%. Livestock outweigh wild mammals roughly 15 to 1.</div>
+                <div style={{ fontFamily: SERIF, fontSize: 13.5, color: "rgba(236,227,208,.7)", marginTop: 5 }}>Cattle alone (~0.06 Gt C) roughly equal all of humanity by weight — and each is about 9&times; every wild mammal combined (0.007 Gt C). Wild mammals are ~4% of the total.</div>
               </div>
             </div>
             <div>

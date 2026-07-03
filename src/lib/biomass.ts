@@ -29,12 +29,14 @@ const ALL_LIFE: BiomassRow[] = [
   { label: "Animals (all)", v: 2, color: "#f04a26" },
 ];
 
-// Mammals by biomass — the starkest cut. Livestock (cattle + pigs) and humans
-// dwarf everything wild. Wild mammals are ~4% of mammal biomass.
+// Mammals by biomass — the starkest cut. Cattle alone ≈ humans, and each is
+// ~9x ALL wild mammals combined. Bar-On 2018: livestock 0.1 Gt C total (cattle
+// ~0.06, dominant), humans 0.06, wild mammals just 0.007.
 const MAMMALS: BiomassRow[] = [
-  { label: "Livestock (cattle, pigs, sheep)", v: 0.1, color: "#f04a26" },
+  { label: "Cattle", v: 0.06, color: "#f04a26" },
   { label: "Humans", v: 0.06, color: "#e3a63e" },
-  { label: "Wild mammals", v: 0.007, color: "#79bd6e" },
+  { label: "Pigs, sheep & other livestock", v: 0.04, color: "#cf8f34" },
+  { label: "Wild mammals (all, land + sea)", v: 0.007, color: "#79bd6e" },
 ];
 
 export function biomassRows(view: BiomassView) {
