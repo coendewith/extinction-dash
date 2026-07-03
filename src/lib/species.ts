@@ -4,12 +4,18 @@ export const STATUS: Record<
   string,
   { bg: string; dot: string; sev: number; full: string }
 > = {
+  EX: { bg: "rgba(27,24,19,.10)", dot: "#1b1813", sev: 0, full: "Extinct" },
+  EW: { bg: "rgba(27,24,19,.08)", dot: "#4a3f6b", sev: 1, full: "Extinct in the Wild" },
+  "CR (PE)": { bg: "rgba(138,58,85,.13)", dot: "#8a3a55", sev: 2, full: "Critically Endangered (Possibly Extinct)" },
   CR: { bg: "rgba(216,57,28,.13)", dot: "#d8391c", sev: 3, full: "Critically Endangered" },
   EN: { bg: "rgba(207,143,52,.15)", dot: "#cf8f34", sev: 4, full: "Endangered" },
   VU: { bg: "rgba(184,161,62,.16)", dot: "#b8a13e", sev: 5, full: "Vulnerable" },
-  EW: { bg: "rgba(27,24,19,.08)", dot: "#1b1813", sev: 1, full: "Extinct in the Wild" },
-  EX: { bg: "rgba(27,24,19,.10)", dot: "#1b1813", sev: 0, full: "Extinct" },
-  "CR (PE)": { bg: "rgba(138,58,85,.13)", dot: "#8a3a55", sev: 2, full: "Critically Endangered (Possibly Extinct)" },
+  NT: { bg: "rgba(122,155,62,.15)", dot: "#7a9b3e", sev: 6, full: "Near Threatened" },
+  DD: { bg: "rgba(138,128,105,.14)", dot: "#8a8069", sev: 8, full: "Data Deficient" },
+  LC: { bg: "rgba(79,138,72,.13)", dot: "#4f8a48", sev: 7, full: "Least Concern" },
+  "LR/nt": { bg: "rgba(122,155,62,.15)", dot: "#7a9b3e", sev: 6, full: "Lower Risk / near threatened" },
+  "LR/cd": { bg: "rgba(122,155,62,.15)", dot: "#7a9b3e", sev: 6, full: "Lower Risk / conservation dependent" },
+  "LR/lc": { bg: "rgba(79,138,72,.13)", dot: "#4f8a48", sev: 7, full: "Lower Risk / least concern" },
 };
 
 export const TREND: Record<Trend, { icon: string; color: string; label: string; order: number }> = {

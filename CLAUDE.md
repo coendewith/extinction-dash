@@ -5,56 +5,76 @@ decision, quirk, or lesson comes up, record it here so it isn't rediscovered.
 
 ## What this is
 
-A public dashboard — "Sixth Mass Extinction Watch" — that tracks a curated
-watchlist of imperilled species alongside global abundance trends (Living Planet
-Index) and biomass scale (Bar-On et al. 2018). Editorial stance: **keep measured
-facts visually separate from modelled projections** (solid vs dashed, everywhere),
-and never show a fake "days until extinction" number.
+A public dashboard — "Sixth Mass Extinction Watch". Two tiers:
 
-Originated as a Claude Design (`.dc.html`) mockup; this repo is the real,
-deployable implementation of that design.
+1. **Curated top matter** — a hero countdown (Vaquita), a Living Planet Index
+   trend chart, and a biomass section (Bar-On 2018). Editorial stance: **keep
+   measured facts visually separate from modelled projections** (solid vs
+   dashed), and never show a fake "days until extinction" number.
+2. **The complete Red List explorer** — every IUCN-assessed animal species
+   (~88,400), searchable/filterable/paginated live, ranked by extinction risk,
+   with a country/region filter. This is the FIG. 02 section.
+
+Originated as a Claude Design (`.dc.html`) mockup of the 24-species version; grew
+into the full-dataset explorer.
 
 ## Stack & why
 
 - **Next.js 15 (App Router) + React 19 + TypeScript**, deployed on **Vercel**.
-- **No database (no Supabase).** The dataset is tiny (24 curated species) and
-  editorial. A build-time pipeline bakes everything to JSON committed in the
-  repo, and one serverless route overlays live IUCN data. A DB would add a
-  moving part with no payoff. Revisit only if the watchlist grows into the
-  hundreds or needs user-generated content.
-- **Secrets stay server-side.** `IUCN_TOKEN` is used only in the build script
-  and the `/api/species` route. It is never imported into a client component.
+- **Supabase (Postgres) IS used** — for the ~88k-species explorer. That volume
+  can't ship to the browser, and the ask was fast filtering, so it's server-side:
+  indexed queries + pagination + trigram search over PostgREST. (The earlier
+  24-species version needed no DB; the full dataset does.)
+- **Two data planes:**
+  - *Curated* (hero + chart + biomass): still baked JSON committed in the repo
+    (`src/data/species.json`, `lpi.json`), IUCN-enriched at build time. The
+    24 curated entries also carry editorial fields (windows, last-seen) surfaced
+    as rich detail when they appear in the explorer.
+  - *Full dataset* (explorer): Supabase `species` + `species_countries` tables,
+    queried via `/api/species/search`.
+- **Secrets stay server-side.** `IUCN_TOKEN` (build + `/api/species`), and the
+  Supabase keys live in env vars. The publishable (anon) key is read-only under
+  RLS; only `SELECT` is granted to `anon` in production.
 
 ## Architecture
 
 ```
-scripts/species-seed.mjs   Editorial source of truth (24 species, curated fields)
-scripts/compute-lpi.py     Reads the LPD CSV → src/data/lpi.json (group trends)
-scripts/build-data.mjs     Runs compute-lpi + IUCN v4 enrichment → src/data/species.json
-src/data/*.json            Generated, committed. The app imports these directly.
-src/lib/                   types, species/chart/biomass logic, server-only iucn client
-src/components/Dashboard.tsx   The whole UI (client component, ported from the .dc.html)
-src/app/page.tsx           Server component: imports JSON, renders <Dashboard/> (SSG)
-src/app/api/species/route.ts   Serverless: baked JSON + live IUCN overlay (24h ISR)
+scripts/species-seed.mjs   Curated 24 (editorial source of truth)
+scripts/compute-lpi.py     LPD CSV → src/data/lpi.json (group trends)
+scripts/build-data.mjs     compute-lpi + IUCN v4 enrichment → src/data/species.json
+scripts/ingest-iucn.mjs    Harvest ALL ~88k animal species → data/iucn/all-animals.ndjson
+scripts/load-supabase.mjs  Bulk-load all-animals.ndjson → Supabase species table
+scripts/ingest-countries.mjs  Harvest species↔country occurrence (curated country list)
+scripts/load-countries.mjs    Load pairs → Supabase species_countries
+src/data/countries.json    Curated country list (dropdown + harvester share it)
+src/lib/supabase.ts        Server-side PostgREST search helper (filter/sort/paginate/country join)
+src/lib/iucn.ts            Server-only IUCN v4 client (curated overlay)
+src/components/Dashboard.tsx   Hero + LPI chart + biomass + sources (curated)
+src/components/Explorer.tsx    FIG.02 — the full Supabase-backed species explorer
+src/app/api/species/route.ts        Curated overlay (24, live IUCN)
+src/app/api/species/search/route.ts Full-dataset search over Supabase
 ```
 
-Data flow: `page.tsx` renders fully from baked JSON (site works even if the API
-or IUCN is down). After mount, `Dashboard` fetches `/api/species` to refresh
-statuses live; on failure it silently keeps the baked data. A "LIVE / SNAPSHOT"
-badge in the nav reflects which is in use.
+Data flow: the page renders the curated top matter from baked JSON; the Explorer
+(client) fetches `/api/species/search` for the live 88k dataset (debounced search,
+filter chips, country dropdown, pagination). Photos + common names load lazily
+from Wikipedia per visible row.
 
 ## Commands
 
 ```bash
 npm run dev        # local dev
-npm run build      # production build (also runs lint + typecheck)
-npm run data       # regenerate src/data/*.json (needs IUCN_TOKEN + the LPD CSV)
-npm run data:lpi   # just recompute LPI trends from the CSV
+npm run build      # production build (lint + typecheck)
+npm run data       # regenerate curated src/data/*.json (IUCN + LPD CSV)
+npm run harvest    # harvest ALL animal species from IUCN → data/iucn/all-animals.ndjson
+npm run load       # bulk-load harvested species → Supabase
+npm run harvest:countries  # harvest species↔country occurrence
+npm run load:countries     # load country pairs → Supabase
 ```
 
-`npm run data` is the refresh path: it recomputes LPI trends (if the CSV is
-present under `data/lpi/`) and re-queries IUCN for every species. Commit the
-regenerated JSON.
+Full refresh: `npm run harvest && npm run load` (species), then
+`npm run harvest:countries && npm run load:countries`. Harvests are resumable
+(page-level checkpoints under `data/iucn/parts/`).
 
 ## Data sources & their quirks
 
@@ -119,6 +139,38 @@ regenerated JSON.
 - **The nav LIVE/SNAPSHOT badge reads the API's `live` flag** (`j.live === true`),
   not merely the presence of a species array — otherwise it falsely claims live
   IUCN sync when the route served the build-time snapshot (no token / IUCN down).
+
+### Scaling to all species (the full explorer)
+
+- **`latest=true` is the critical query param.** The IUCN list endpoints
+  (`/taxa/class/{C}`, `/taxa/kingdom/ANIMALIA`, `/countries/{cc}`) return EVERY
+  historical + regional assessment by default — birds are 936 pages that way,
+  mostly old reassessments (`latest:false`). Adding `?latest=true` drops those
+  server-side (birds → 118 pages, ~8×). Always harvest with it. We still keep
+  only global scope (`scopes[].code === "1"`) client-side so each species has one
+  canonical global-category row.
+- **Rate limit is on burst/concurrency, not steady rate.** ~3–4 req/s sequential
+  is fine; concurrency >1 or parallel probing triggers 429s. Harvest sequentially
+  (~260 ms pacing) with exponential backoff. Don't run two harvests at once, and
+  don't hammer the API with probes while a harvest runs (same token/IP bucket).
+- **Harvests are page-level resumable** (`data/iucn/parts/<taxon>.progress.json`).
+  A 429/network drop resumes mid-taxon. `per_page` is capped at 100 (bigger is
+  ignored). Group comes from the class/phylum queried (list items carry no
+  taxonomy); enumerate classes for fine vertebrate groups + phyla as a net.
+- **Country filter** = `species_countries(sis_id, country_code)` with a FK to
+  `species`, harvested per country from `/countries/{cc}`. The search API
+  inner-joins it: `species?...&species_countries!inner(country_code)&species_countries.country_code=eq.NL`.
+  Countries are a curated set (`src/data/countries.json`, ~60) to keep the harvest
+  bounded — extend the list + re-run `harvest:countries` to add more.
+- **Bulk load** goes through PostgREST with a TEMPORARY anon insert/update RLS
+  policy, then those policies are DROPPED before deploy (never ship a public
+  anon-writable table). The MCP doesn't expose the service_role key, hence this
+  dance. Load order matters: species before species_countries (FK).
+- **common_name is null in the DB** for the bulk (per-species enrichment = 88k
+  calls). The UI fills common names + photos from Wikipedia per visible row, so
+  search matches SCIENTIFIC names only. Enriching common names for the threatened
+  subset into the DB is the obvious future improvement (would make common-name
+  search work).
 
 ### Review process note
 Before the public deploy, an adversarial review workflow (4 dimensions ×

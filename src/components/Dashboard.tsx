@@ -2,18 +2,10 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { LpiData, Species } from "@/lib/types";
-import {
-  decorate,
-  filterSort,
-  elapsed,
-  since,
-  ymd,
-  STATUS,
-  GROUPS,
-  type SortKey,
-} from "@/lib/species";
+import { decorate, elapsed } from "@/lib/species";
 import { buildChart, valueAt } from "@/lib/chart";
 import { biomassRows, composition, sources, type BiomassView } from "@/lib/biomass";
+import Explorer from "./Explorer";
 
 const DISPLAY = "'Bricolage Grotesque', sans-serif";
 const SERIF = "'Newsreader', Georgia, serif";
@@ -37,17 +29,10 @@ export default function Dashboard({
   const [live, setLive] = useState(false);
   const [now, setNow] = useState(() => Date.now());
   const [scrubYear, setScrubYear] = useState(lpi.observedEnd);
-  const [search, setSearch] = useState("");
-  const [groupFilter, setGroupFilter] = useState("");
-  const [kindFilter, setKindFilter] = useState("");
-  const [sortKey, setSortKey] = useState<SortKey>("soonest");
-  const [sortDir, setSortDir] = useState<"asc" | "desc">("asc");
   const [chartOff, setChartOff] = useState<Record<string, boolean>>({});
-  const [expandedId, setExpandedId] = useState<number | null>(null);
   const [images, setImages] = useState<Record<string, string>>({});
   const [showProj, setShowProj] = useState(true);
   const [biomassView, setBiomassView] = useState<BiomassView>("Animals only");
-  const [compact, setCompact] = useState(false);
 
   // ticking clock for the live countdowns
   useEffect(() => {
@@ -91,10 +76,6 @@ export default function Dashboard({
   }, []);
 
   const decorated = useMemo(() => decorate(species), [species]);
-  const rows = useMemo(
-    () => filterSort(decorated, { search, groupFilter, kindFilter, sortKey, sortDir }),
-    [decorated, search, groupFilter, kindFilter, sortKey, sortDir]
-  );
   const chart = useMemo(() => buildChart(lpi, scrubYear, chartOff, showProj), [lpi, scrubYear, chartOff, showProj]);
   const biomass = useMemo(() => biomassRows(biomassView), [biomassView]);
 
@@ -121,35 +102,6 @@ export default function Dashboard({
     },
     [chart.yrMin, chart.yrMax]
   );
-
-  const toggleSort = (key: SortKey) => {
-    setSortDir((d) => (sortKey === key && d === "asc" ? "desc" : "asc"));
-    setSortKey(key);
-  };
-
-  const chip = (active: boolean) =>
-    active
-      ? { background: "#1b1813", color: "#efe7d6", border: "1px solid #1b1813" }
-      : { background: "transparent", color: "#4f4839", border: "1px solid rgba(27,24,19,.22)" };
-
-  const kindDefs = [
-    { label: "All", v: "", icon: "ph ph-list" },
-    { label: "Projected", v: "window", icon: "ph-bold ph-arrows-horizontal" },
-    { label: "Recovering", v: "recovering", icon: "ph-bold ph-trend-up" },
-    { label: "Functionally extinct", v: "fe", icon: "ph-fill ph-x-circle" },
-  ];
-
-  const sortCols: { label: string; key: SortKey | null; justify: string }[] = [
-    { label: "#", key: null, justify: "flex-start" },
-    { label: "SPECIES", key: "name", justify: "flex-start" },
-    { label: "GROUP", key: "group", justify: "flex-start" },
-    { label: "STATUS", key: "status", justify: "flex-start" },
-    { label: "EST. WILD", key: "population", justify: "flex-start" },
-    { label: "EST. EXTINCTION", key: "soonest", justify: "flex-start" },
-    { label: "TREND", key: "trend", justify: "flex-start" },
-    { label: "", key: null, justify: "center" },
-  ];
-  const GRID = "36px minmax(150px,1fr) 88px 74px 92px 176px 92px 30px";
 
   return (
     <div style={{ minHeight: "100vh", background: "#efe7d6" }}>
@@ -455,181 +407,8 @@ export default function Dashboard({
         </div>
       </section>
 
-      {/* WATCHLIST */}
-      <section id="watchlist" style={{ background: "#efe7d6", color: "#1b1813" }}>
-        <div style={{ maxWidth: 1220, margin: "0 auto", padding: "48px 30px 44px" }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 10 }}>
-            <span style={{ fontFamily: MONO, fontWeight: 700, fontSize: 11, letterSpacing: ".2em", color: "#d8391c" }}>FIG. 02</span>
-            <span style={{ width: 34, height: 1, background: "rgba(27,24,19,.3)" }} />
-            <span style={{ fontFamily: MONO, fontWeight: 700, fontSize: 11, letterSpacing: ".2em", color: "#8a8069" }}>THE WATCHLIST</span>
-          </div>
-          <h2 style={{ fontFamily: DISPLAY, fontWeight: 700, fontSize: 32, lineHeight: 1.02, letterSpacing: "-.02em", margin: 0 }}>Ranked by soonest projected extinction</h2>
-          <p style={{ fontFamily: SERIF, fontSize: 16, lineHeight: 1.55, color: "#4f4839", margin: "8px 0 0", maxWidth: "72ch" }}>
-            Recovering species point up and carry no countdown. Functionally extinct species are marked, never counted down. Projected windows are ranges from IUCN Criterion E, not single dates.
-          </p>
-
-          {/* controls */}
-          <div style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: 11, marginTop: 24 }}>
-            <div style={{ display: "flex", alignItems: "center", gap: 9, background: "#f6f0e2", border: "1px solid rgba(27,24,19,.2)", borderRadius: 3, padding: "9px 14px", minWidth: 230 }}>
-              <i className="ph ph-magnifying-glass" style={{ color: "#8a8069", fontSize: 15 }} />
-              <input
-                value={search}
-                onChange={(e) => {
-                  setSearch(e.target.value);
-                  setExpandedId(null);
-                }}
-                placeholder="Search species or scientific name"
-                style={{ border: "none", outline: "none", background: "transparent", fontFamily: MONO, fontSize: 12.5, color: "#1b1813", width: "100%" }}
-              />
-            </div>
-            <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
-              {GROUPS.map((g) => {
-                const val = g === "All" ? "" : g;
-                return (
-                  <button
-                    key={g}
-                    onClick={() => {
-                      setGroupFilter(val);
-                      setExpandedId(null);
-                    }}
-                    style={{ fontFamily: MONO, fontSize: 11, letterSpacing: ".04em", textTransform: "uppercase", padding: "8px 13px", borderRadius: 2, cursor: "pointer", ...chip(groupFilter === val) }}
-                  >
-                    {g}
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-          <div style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: 6, marginTop: 10 }}>
-            <span style={{ fontFamily: MONO, fontWeight: 700, fontSize: 10, letterSpacing: ".14em", color: "#8a8069", marginRight: 3 }}>SHOW</span>
-            {kindDefs.map((c) => (
-              <button
-                key={c.label}
-                onClick={() => {
-                  setKindFilter(c.v);
-                  setExpandedId(null);
-                }}
-                style={{ display: "inline-flex", alignItems: "center", gap: 6, fontFamily: MONO, fontSize: 11, letterSpacing: ".04em", textTransform: "uppercase", padding: "7px 12px", borderRadius: 2, cursor: "pointer", ...chip(kindFilter === c.v) }}
-              >
-                <i className={c.icon} style={{ fontSize: 13 }} />
-                {c.label}
-              </button>
-            ))}
-            <button
-              onClick={() => setCompact((v) => !v)}
-              style={{ display: "inline-flex", alignItems: "center", gap: 6, fontFamily: MONO, fontSize: 11, letterSpacing: ".04em", textTransform: "uppercase", padding: "7px 12px", borderRadius: 2, cursor: "pointer", ...chip(compact) }}
-            >
-              <i className="ph-bold ph-rows" style={{ fontSize: 13 }} />
-              Compact
-            </button>
-            <span style={{ marginLeft: "auto", fontFamily: MONO, fontSize: 11.5, color: "#8a8069" }}>
-              {rows.length} / {decorated.length} SPECIES
-            </span>
-          </div>
-
-          {/* table */}
-          <div style={{ background: "#f6f0e2", border: "1px solid rgba(27,24,19,.18)", borderRadius: 4, overflow: "hidden", marginTop: 16 }}>
-            <div className="wl-scroll">
-              <div className="wl-min">
-                <div style={{ display: "grid", gridTemplateColumns: GRID, gap: 12, padding: "13px 22px", background: "rgba(27,24,19,.06)", alignItems: "center", borderBottom: "1px solid rgba(27,24,19,.14)" }}>
-                  {sortCols.map((col, i) => {
-                    const activeSort = col.key && sortKey === col.key;
-                    return (
-                      <button
-                        key={i}
-                        onClick={() => col.key && toggleSort(col.key)}
-                        style={{
-                          display: "flex",
-                          alignItems: "center",
-                          gap: 4,
-                          justifyContent: col.justify,
-                          background: "none",
-                          border: "none",
-                          padding: 0,
-                          cursor: col.key ? "pointer" : "default",
-                          fontFamily: MONO,
-                          fontWeight: 700,
-                          fontSize: 9.5,
-                          letterSpacing: ".1em",
-                          color: activeSort ? "#1b1813" : "#8a8069",
-                          textAlign: "left",
-                        }}
-                      >
-                        {col.label}
-                        {activeSort && <i className={sortDir === "desc" ? "ph-bold ph-caret-down" : "ph-bold ph-caret-up"} style={{ fontSize: 11 }} />}
-                      </button>
-                    );
-                  })}
-                </div>
-
-                {rows.map((r, i) => {
-                  const expanded = expandedId === r.gbifId;
-                  const img = images[r.wiki];
-                  return (
-                    <div key={r.gbifId} style={{ borderTop: "1px solid rgba(27,24,19,.09)" }}>
-                      <div
-                        onClick={() => setExpandedId((id) => (id === r.gbifId ? null : r.gbifId))}
-                        className="wl-row"
-                        style={{ display: "grid", gridTemplateColumns: GRID, gap: 12, alignItems: "center", padding: compact ? "7px 22px" : "11px 22px", cursor: "pointer", background: expanded ? "rgba(27,24,19,.05)" : "transparent" }}
-                      >
-                        <div style={{ fontFamily: MONO, fontWeight: 700, fontSize: 14, color: "#b9ae94" }}>{String(i + 1).padStart(2, "0")}</div>
-                        <div style={{ display: "flex", alignItems: "center", gap: 11, minWidth: 0 }}>
-                          <div style={{ width: 36, height: 36, flex: "none", borderRadius: 3, overflow: "hidden", background: "#16221b", border: "1px solid rgba(27,24,19,.12)", display: "flex", alignItems: "center", justifyContent: "center" }}>
-                            {img ? (
-                              // eslint-disable-next-line @next/next/no-img-element
-                              <img src={img} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
-                            ) : (
-                              <i className={"ph " + r.groupIcon} style={{ fontSize: 16, color: "rgba(55,169,157,.55)" }} />
-                            )}
-                          </div>
-                          <div style={{ minWidth: 0 }}>
-                            <div style={{ fontFamily: DISPLAY, fontWeight: 600, fontSize: 15, color: "#1b1813", lineHeight: 1.15, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{r.common}</div>
-                            <div style={{ fontFamily: SERIF, fontStyle: "italic", fontSize: 12.5, color: "#8a8069", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{r.sci}</div>
-                          </div>
-                        </div>
-                        <div style={{ fontFamily: MONO, fontSize: 11, letterSpacing: ".02em", color: "#4f4839" }}>{r.group}</div>
-                        <div>
-                          <span style={{ display: "inline-flex", alignItems: "center", gap: 6, background: r.statusBg, padding: "4px 8px", borderRadius: 2 }}>
-                            <span style={{ width: 6, height: 6, background: r.statusDot, flex: "none" }} />
-                            <span style={{ fontFamily: MONO, fontWeight: 700, fontSize: 10.5, color: "#1b1813" }}>{r.status}</span>
-                          </span>
-                        </div>
-                        <div style={{ fontFamily: MONO, fontSize: 12, color: "#1b1813" }}>{r.pop}</div>
-                        <div>
-                          <div style={{ display: "flex", alignItems: "baseline", gap: 6 }}>
-                            <span style={{ fontFamily: MONO, fontWeight: 700, fontSize: 13, color: r.estColor }}>{r.estDate}</span>
-                            <span style={{ fontFamily: MONO, fontSize: 9, color: "#8a8069" }}>{r.estSub}</span>
-                          </div>
-                          <svg viewBox="0 0 176 46" style={{ width: "100%", maxWidth: 156, height: 20, display: "block", marginTop: 3 }}>
-                            <polyline points={r.sparkObs} fill="none" stroke={r.sparkColor} strokeWidth={3} strokeLinecap="round" strokeLinejoin="round" />
-                            <polyline points={r.sparkProj} fill="none" stroke={r.sparkColor} strokeWidth={2.5} strokeDasharray="3 3" opacity={0.6} strokeLinecap="round" />
-                          </svg>
-                        </div>
-                        <div style={{ display: "flex", alignItems: "center", gap: 6, fontFamily: MONO, fontSize: 11, letterSpacing: ".02em", color: r.trendColor }}>
-                          <i className={"ph-bold " + r.trendIcon} style={{ fontSize: 15 }} />
-                          {r.trendLabel}
-                        </div>
-                        <div style={{ display: "flex", justifyContent: "center" }}>
-                          <i className={expanded ? "ph ph-caret-up" : "ph ph-caret-down"} style={{ fontSize: 16, color: "#8a8069" }} />
-                        </div>
-                      </div>
-
-                      {expanded && <SpeciesDetail r={r} img={img} now={now} />}
-                    </div>
-                  );
-                })}
-
-                {rows.length === 0 && (
-                  <div style={{ padding: "34px 22px", textAlign: "center", fontFamily: SERIF, color: "#8a8069", fontSize: 15, borderTop: "1px solid rgba(27,24,19,.09)" }}>No species match these filters.</div>
-                )}
-              </div>
-            </div>
-          </div>
-          <div style={{ fontFamily: MONO, fontSize: 10.5, letterSpacing: ".02em", color: "#8a8069", marginTop: 12 }}>
-            CLICK ANY ROW TO OPEN ITS DETAIL / SORT BY ANY COLUMN / PHOTOS LOAD LIVE FROM WIKIPEDIA / STATUS SYNCED FROM THE IUCN RED LIST
-          </div>
-        </div>
-      </section>
+      {/* WATCHLIST — full IUCN Red List, Supabase-backed */}
+      <Explorer curated={species} />
 
       {/* BIOMASS */}
       <section id="biomass" style={{ background: "#26140f", color: "#ece3d0" }}>
@@ -813,100 +592,3 @@ function Countdown({ fromISO, now }: { fromISO: string; now: number }) {
   );
 }
 
-function SpeciesDetail({ r, img, now }: { r: ReturnType<typeof decorate>[number]; img?: string; now: number }) {
-  const statusFull = STATUS[r.status]?.full || r.status;
-  return (
-    <div style={{ padding: "4px 22px 26px", background: "rgba(27,24,19,.035)" }}>
-      <div className="detail-grid" style={{ display: "grid", gridTemplateColumns: "170px minmax(0,1fr) 224px", gap: 26, alignItems: "start", paddingTop: 18 }}>
-        {/* image + links */}
-        <div>
-          <div style={{ width: 170, height: 132, borderRadius: 3, background: "#16221b", border: "1px solid rgba(27,24,19,.12)", position: "relative", overflow: "hidden", display: "flex", alignItems: "flex-end", padding: 10 }}>
-            {img ? (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img src={img} alt={r.common} style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover" }} />
-            ) : (
-              <>
-                <i className={"ph " + r.groupIcon} style={{ position: "absolute", top: 12, right: 12, fontSize: 26, color: "rgba(55,169,157,.6)" }} />
-                <span style={{ fontFamily: MONO, fontSize: 8, letterSpacing: ".06em", color: "rgba(236,227,208,.55)" }}>PHOTO / GBIF / WIKIMEDIA</span>
-              </>
-            )}
-          </div>
-          {img && <div style={{ fontFamily: MONO, fontSize: 8.5, letterSpacing: ".04em", color: "#8a8069", marginTop: 5 }}>PHOTO / WIKIMEDIA COMMONS</div>}
-          <div style={{ display: "flex", flexWrap: "wrap", gap: 14, marginTop: 9 }}>
-            <a href={r.wikiUrl} target="_blank" rel="noopener noreferrer" style={{ display: "inline-flex", alignItems: "center", gap: 5, fontFamily: MONO, fontSize: 10.5, letterSpacing: ".04em", color: "#1b1813", textDecoration: "none", borderBottom: "1px solid #d8391c", paddingBottom: 1 }}>
-              WIKIPEDIA <i className="ph ph-arrow-square-out" style={{ fontSize: 12 }} />
-            </a>
-            <a href={r.gbifUrl} target="_blank" rel="noopener noreferrer" style={{ display: "inline-flex", alignItems: "center", gap: 5, fontFamily: MONO, fontSize: 10.5, letterSpacing: ".04em", color: "#1b1813", textDecoration: "none", borderBottom: "1px solid #d8391c", paddingBottom: 1 }}>
-              GBIF <i className="ph ph-arrow-square-out" style={{ fontSize: 12 }} />
-            </a>
-            <a href={r.iucn.url} target="_blank" rel="noopener noreferrer" style={{ display: "inline-flex", alignItems: "center", gap: 5, fontFamily: MONO, fontSize: 10.5, letterSpacing: ".04em", color: "#1b1813", textDecoration: "none", borderBottom: "1px solid #d8391c", paddingBottom: 1 }}>
-              IUCN <i className="ph ph-arrow-square-out" style={{ fontSize: 12 }} />
-            </a>
-          </div>
-        </div>
-
-        {/* facts */}
-        <div className="detail-facts" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "16px 22px" }}>
-          <Fact label="REGION" labelColor="#8a8069">{r.region}</Fact>
-          <Fact label="EST. WILD POPULATION" labelColor="#8a8069">
-            {r.pop} <span style={{ color: "#8a8069" }}>(measured)</span>
-          </Fact>
-          <div>
-            <div style={{ fontFamily: MONO, fontWeight: 700, fontSize: 9.5, letterSpacing: ".1em", color: "#d8391c" }}>MEASURED / SINCE LAST SIGHTING</div>
-            <div style={{ fontFamily: MONO, fontWeight: 700, fontSize: 17, color: "#1b1813", marginTop: 4 }}>{since(r.lastSeen, now)} ago</div>
-            <div style={{ fontFamily: SERIF, fontSize: 13, color: "#8a8069" }}>last seen {ymd(r.lastSeen)}</div>
-          </div>
-          <Fact label="IUCN STATUS" labelColor="#8a8069">
-            {statusFull}
-            {r.critE ? "  ·  Criterion E" : ""}
-            {r.iucn.category && r.iucn.matchesSeed === false && (
-              <div style={{ fontFamily: MONO, fontSize: 10.5, color: "#8a8069", marginTop: 3 }}>
-                IUCN species-level: {r.iucn.category}
-                {r.iucn.yearPublished ? ` (${r.iucn.yearPublished})` : ""}
-              </div>
-            )}
-          </Fact>
-        </div>
-
-        {/* projection / status card */}
-        <div style={{ background: "#16221b", borderRadius: 4, padding: "16px 17px", color: "#ece3d0" }}>
-          {r.isWindow && (
-            <>
-              <div style={{ fontFamily: MONO, fontWeight: 700, fontSize: 9.5, letterSpacing: ".12em", color: "#e3a63e" }}>MODELLED / PROJECTED WINDOW</div>
-              <div style={{ fontFamily: DISPLAY, fontWeight: 700, fontSize: 27, marginTop: 4, letterSpacing: "-.01em" }}>{r.winText}</div>
-              <div style={{ fontFamily: SERIF, fontSize: 12, color: "rgba(236,227,208,.62)", marginTop: 3 }}>{r.conf}</div>
-            </>
-          )}
-          {r.isRecovering && (
-            <>
-              <div style={{ fontFamily: MONO, fontWeight: 700, fontSize: 9.5, letterSpacing: ".12em", color: "#79bd6e" }}>STATUS</div>
-              <div style={{ fontFamily: DISPLAY, fontWeight: 700, fontSize: 23, marginTop: 4, color: "#79bd6e" }}>Recovering</div>
-              <div style={{ fontFamily: SERIF, fontSize: 12, color: "rgba(236,227,208,.62)", marginTop: 3 }}>No countdown. Population trending up under active conservation.</div>
-            </>
-          )}
-          {r.isFE && (
-            <>
-              <div style={{ fontFamily: MONO, fontWeight: 700, fontSize: 9.5, letterSpacing: ".12em", color: "rgba(236,227,208,.6)" }}>STATUS</div>
-              <div style={{ fontFamily: DISPLAY, fontWeight: 700, fontSize: 22, marginTop: 4 }}>{r.feText}</div>
-              <div style={{ fontFamily: SERIF, fontSize: 12, color: "rgba(236,227,208,.62)", marginTop: 3 }}>No viable wild population remains. Not counted down.</div>
-            </>
-          )}
-          <div style={{ fontFamily: MONO, fontWeight: 700, fontSize: 9.5, letterSpacing: ".12em", color: "rgba(236,227,208,.5)", marginTop: 15 }}>ABUNDANCE INDEX</div>
-          <svg viewBox="0 0 176 46" style={{ width: "100%", height: "auto", marginTop: 5, display: "block" }}>
-            <polyline points={r.sparkObs} fill="none" stroke={r.sparkColor} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />
-            <polyline points={r.sparkProj} fill="none" stroke={r.sparkColor} strokeWidth={1.8} strokeDasharray="3 3" opacity={0.7} />
-          </svg>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function Fact({ label, labelColor, children }: { label: string; labelColor: string; children: React.ReactNode }) {
-  return (
-    <div>
-      <div style={{ fontFamily: MONO, fontWeight: 700, fontSize: 9.5, letterSpacing: ".1em", color: labelColor }}>{label}</div>
-      <div style={{ fontFamily: SERIF, fontSize: 15, color: "#1b1813", marginTop: 3 }}>{children}</div>
-    </div>
-  );
-}

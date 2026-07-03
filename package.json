@@ -9,7 +9,11 @@
     "start": "next start",
     "lint": "next lint",
     "data": "node scripts/build-data.mjs",
-    "data:lpi": "python3 scripts/compute-lpi.py"
+    "data:lpi": "python3 scripts/compute-lpi.py",
+    "harvest": "node scripts/ingest-iucn.mjs",
+    "load": "node scripts/load-supabase.mjs",
+    "harvest:countries": "node scripts/ingest-countries.mjs",
+    "load:countries": "node scripts/load-countries.mjs"
   },
   "dependencies": {
     "@phosphor-icons/web": "^2.1.1",
