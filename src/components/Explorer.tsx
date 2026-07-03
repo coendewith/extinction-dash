@@ -59,10 +59,13 @@ type Projection =
   | { kind: "window"; lo: number; hi: number; mid: number; label: string; sub: string; color: string; beyond: boolean }
   | { kind: "extinct"; label: string; sub: string; color: string }
   | { kind: "ew"; label: string; sub: string; color: string }
+  | { kind: "recovering"; label: string; sub: string; color: string }
   | { kind: "none"; label: string; sub: string; color: string };
 function projectionFor(cat: string, trend: string | null, popSize: string | null | undefined): Projection {
   if (cat === "EX") return { kind: "extinct", label: "Extinct", sub: "confirmed", color: "#8a8069" };
   if (cat === "EW") return { kind: "ew", label: "Extinct in wild", sub: "no wild population", color: "#4a3f6b" };
+  // A measured increasing population is recovering — no extinction countdown.
+  if (trend === "up") return { kind: "recovering", label: "Recovering", sub: "population rising", color: "#4f8a48" };
   const base = RISK_BASE[cat];
   if (!base) return { kind: "none", label: "—", sub: cat === "DD" ? "data deficient" : "lower risk", color: "#b9ae94" };
   let m = trend === "down" ? 0.72 : trend === "up" ? 1.6 : trend === "unknown" ? 1.15 : 1.0;
@@ -80,6 +83,8 @@ function projectionFor(cat: string, trend: string | null, popSize: string | null
   const color = cat === "CR (PE)" || cat === "CR" ? "#c23417" : cat === "EN" ? "#cf8f34" : "#8a8069";
   return { kind: "window", lo, hi, mid, label: "≈" + mid, sub: beyond ? `${lo}–2130+` : `${lo}–${hi}`, color, beyond };
 }
+
+type SortKey = "severity" | "name" | "year" | "extinction" | "group" | "population" | "trend";
 
 const DISPLAY = "'Bricolage Grotesque', sans-serif";
 const SERIF = "'Newsreader', Georgia, serif";
@@ -115,7 +120,8 @@ export default function Explorer({ curated }: { curated: Species[] }) {
   const [group, setGroup] = useState<string>("");
   const [country, setCountry] = useState<string>("");
   const [measured, setMeasured] = useState(true); // default: only species with real IUCN-measured data
-  const [sort, setSort] = useState<"severity" | "name" | "year" | "extinction">("severity");
+  const [trendFilter, setTrendFilter] = useState<string>(""); // "" | "up" (Recovering) | "down"
+  const [sort, setSort] = useState<SortKey>("severity");
   const [dir, setDir] = useState<"asc" | "desc">("desc");
   const [page, setPage] = useState(1);
   const pageSize = 50;
@@ -153,7 +159,7 @@ export default function Explorer({ curated }: { curated: Species[] }) {
   // reset to page 1 whenever the query shape changes
   useEffect(() => {
     setPage(1);
-  }, [debouncedQ, cats, group, country, measured, sort, dir]);
+  }, [debouncedQ, cats, group, country, measured, trendFilter, sort, dir]);
 
   // fetch results
   useEffect(() => {
@@ -165,6 +171,7 @@ export default function Explorer({ curated }: { curated: Species[] }) {
     if (group) params.set("group", group);
     if (country) params.set("country", country);
     if (measured) params.set("measured", "1");
+    if (trendFilter) params.set("trend", trendFilter);
     params.set("sort", sort);
     params.set("dir", dir);
     params.set("page", String(page));
@@ -185,7 +192,7 @@ export default function Explorer({ curated }: { curated: Species[] }) {
     return () => {
       cancelled = true;
     };
-  }, [debouncedQ, cats, group, country, measured, sort, dir, page]);
+  }, [debouncedQ, cats, group, country, measured, trendFilter, sort, dir, page]);
 
   // lazy Wikipedia enrichment for the visible rows (image + common name + extract)
   useEffect(() => {
@@ -242,11 +249,11 @@ export default function Explorer({ curated }: { curated: Species[] }) {
       const same = prev.size === p.length && p.every((c) => prev.has(c));
       return same ? new Set() : new Set(p);
     });
-  const clickSort = (key: "severity" | "name" | "year" | "extinction") => {
+  const clickSort = (key: SortKey) => {
     if (sort === key) setDir((d) => (d === "asc" ? "desc" : "asc"));
     else {
       setSort(key);
-      setDir(key === "name" || key === "extinction" ? "asc" : "desc");
+      setDir(key === "name" || key === "extinction" || key === "group" || key === "trend" ? "asc" : "desc");
     }
   };
 
@@ -315,6 +322,19 @@ export default function Explorer({ curated }: { curated: Species[] }) {
             return (
               <button key={p.label} onClick={() => applyPreset(p.cats)} style={{ fontFamily: MONO, fontSize: 11, letterSpacing: ".04em", textTransform: "uppercase", padding: "8px 13px", borderRadius: 2, cursor: "pointer", ...chip(active) }}>
                 {p.label}
+              </button>
+            );
+          })}
+          {/* trend filters — measured population direction */}
+          {[
+            { label: "Recovering", v: "up", icon: "ph-bold ph-trend-up" },
+            { label: "Declining", v: "down", icon: "ph-bold ph-trend-down" },
+          ].map((tf) => {
+            const active = trendFilter === tf.v;
+            return (
+              <button key={tf.v} onClick={() => setTrendFilter((cur) => (cur === tf.v ? "" : tf.v))} title="Filter by measured IUCN population trend"
+                style={{ display: "inline-flex", alignItems: "center", gap: 6, fontFamily: MONO, fontSize: 11, letterSpacing: ".04em", textTransform: "uppercase", padding: "8px 12px", borderRadius: 2, cursor: "pointer", ...chip(active) }}>
+                <i className={tf.icon} style={{ fontSize: 13 }} />{tf.label}
               </button>
             );
           })}
@@ -389,11 +409,11 @@ export default function Explorer({ curated }: { curated: Species[] }) {
           <div className="wl-head wl-grid">
             <div style={H}>#</div>
             <SortHead label="SPECIES" active={sort === "name"} dir={dir} onClick={() => clickSort("name")} />
-            <div className="wl-c-group" style={H}>GROUP</div>
+            <SortHead className="wl-c-group" label="GROUP" active={sort === "group"} dir={dir} onClick={() => clickSort("group")} />
             <SortHead label="RISK" active={sort === "severity"} dir={dir} onClick={() => clickSort("severity")} />
-            <div className="wl-c-pop" style={H}>POPULATION</div>
+            <SortHead className="wl-c-pop" label="POPULATION" active={sort === "population"} dir={dir} onClick={() => clickSort("population")} />
             <SortHead label="EST. EXTINCTION" active={sort === "extinction"} dir={dir} onClick={() => clickSort("extinction")} />
-            <div className="wl-c-trend" style={H}>TREND</div>
+            <SortHead className="wl-c-trend" label="TREND" active={sort === "trend"} dir={dir} onClick={() => clickSort("trend")} />
             <SortHead className="wl-c-assessed" label="ASSESSED" active={sort === "year"} dir={dir} onClick={() => clickSort("year")} />
             <div />
           </div>
@@ -545,6 +565,11 @@ function Detail({ r, wiki, curated, now }: { r: SpeciesRow; wiki?: WikiInfo; cur
   if (curated?.kind === "window" && curated.win) {
     boxBig = `${curated.win[0]}\u2013${curated.win[1]}`;
     boxNote = curated.conf || "Curated Criterion E window.";
+  } else if (proj.kind === "recovering") {
+    boxKicker = "STATUS";
+    boxKickerColor = "#79bd6e";
+    boxBig = "Recovering";
+    boxNote = "Measured population is rising \u2014 no extinction countdown while the trend holds.";
   } else if (proj.kind === "window") {
     boxKicker = "MODELLED / RISK WINDOW";
     boxBig = `${proj.lo}\u2013${proj.beyond ? "2130+" : proj.hi}`;

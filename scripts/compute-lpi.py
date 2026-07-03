@@ -106,12 +106,63 @@ def smooth_series(series):
     return out
 
 
+ALL_YEARS = list(range(BASE, PROJ_END + 1))
+# Sub-population split by system. Colours are tints in each group's family.
+SUBSYS = ["Terrestrial", "Freshwater", "Marine"]
+SUB_LABEL = {"Terrestrial": "Land", "Freshwater": "Freshwater", "Marine": "Marine/ocean"}
+SUB_MIN_SPECIES = 40  # a subgroup needs at least this many species to be shown
+
+
+def compute_index(species):
+    """species: {binomial: [series,...]} -> ([values over ALL_YEARS], observedEnd)."""
+    interp = {sp: [smooth_series(s) for s in pops] for sp, pops in species.items()}
+    idx = {BASE: 100.0}
+    val = 100.0
+    nsp_by_year = {}
+    for y in range(BASE + 1, OBS_END + 1):
+        sp_dts = []
+        for pops in interp.values():
+            pop_dts = []
+            for s in pops:
+                if y in s and (y - 1) in s and s[y] > 0 and s[y - 1] > 0:
+                    pop_dts.append(max(-1.0, min(1.0, math.log10(s[y] / s[y - 1]))))
+            if pop_dts:
+                sp_dts.append(sum(pop_dts) / len(pop_dts))
+        nsp_by_year[y] = len(sp_dts)
+        mean_dt = sum(sp_dts) / len(sp_dts) if sp_dts else 0.0
+        val *= 10 ** mean_dt
+        idx[y] = val
+    # Observed window ends at the last adequately-sampled year.
+    data_end = BASE
+    for y in range(BASE + 1, OBS_END + 1):
+        if nsp_by_year.get(y, 0) >= MIN_SPECIES:
+            data_end = y
+    # Near-term projection: long-run (since 2000) log-rate, flat-to-declining only.
+    p0 = 2000 if data_end > 2000 else BASE
+    rate = (math.log10(idx[data_end]) - math.log10(idx[p0])) / (data_end - p0) if data_end > p0 else 0.0
+    rate = max(-0.010, min(0.0, rate))
+    val = idx[data_end]
+    for y in range(data_end + 1, PROJ_END + 1):
+        val *= 10 ** rate
+        idx[y] = val
+    return [round(idx[y], 1) for y in ALL_YEARS], data_end
+
+
+def tint(hex_color, f):
+    """Blend a hex colour toward white (f=0) or leave (f=1); returns hex."""
+    h = hex_color.lstrip("#")
+    r, gc, b = int(h[0:2], 16), int(h[2:4], 16), int(h[4:6], 16)
+    r = round(r + (255 - r) * (1 - f)); gc = round(gc + (255 - gc) * (1 - f)); b = round(b + (255 - b) * (1 - f))
+    return f"#{r:02x}{gc:02x}{b:02x}"
+
+
 def main():
     if not os.path.exists(CSV):
         sys.exit(f"LPI CSV not found at {CSV}\nUnzip the Living Planet Database into data/lpi/ first.")
 
     from collections import defaultdict
     data = defaultdict(lambda: defaultdict(list))
+    data_sys = defaultdict(lambda: defaultdict(lambda: defaultdict(list)))  # group -> system -> binomial -> [series]
     total_pops = 0; species_set = set()
     with open(CSV, encoding="utf-8-sig") as f:
         for row in csv.DictReader(f):
@@ -130,58 +181,42 @@ def main():
                         pass
             if len(series) >= 2:
                 data[g][row["Binomial"]].append(series)
+                sysname = row.get("System") or ""
+                if sysname in SUBSYS:
+                    data_sys[g][sysname][row["Binomial"]].append(series)
                 total_pops += 1
                 species_set.add(row["Binomial"])
 
-    all_years = list(range(BASE, PROJ_END + 1))
+    all_years = ALL_YEARS
     groups_out = {}
     for g in ORDER:
         species = data[g]
-        interp = {sp: [smooth_series(s) for s in pops] for sp, pops in species.items()}
-        idx = {BASE: 100.0}
-        val = 100.0
-        nsp_by_year = {}
-        for y in range(BASE + 1, OBS_END + 1):
-            sp_dts = []
-            for pops in interp.values():
-                pop_dts = []
-                for s in pops:
-                    if y in s and (y - 1) in s and s[y] > 0 and s[y - 1] > 0:
-                        pop_dts.append(max(-1.0, min(1.0, math.log10(s[y] / s[y - 1]))))
-                if pop_dts:
-                    sp_dts.append(sum(pop_dts) / len(pop_dts))
-            nsp_by_year[y] = len(sp_dts)
-            mean_dt = sum(sp_dts) / len(sp_dts) if sp_dts else 0.0
-            val *= 10 ** mean_dt
-            idx[y] = val
-
-        # Observed window ends at the last adequately-sampled year. Years past it
-        # (a single-population spike, or a no-data flat tail) are not observations.
-        data_end = BASE
-        for y in range(BASE + 1, OBS_END + 1):
-            if nsp_by_year.get(y, 0) >= MIN_SPECIES:
-                data_end = y
-
-        # near-term projection from the observed end, using the long-run (since 2000)
-        # log-rate. We do NOT project recovery: the recent upticks in Fish/Reptiles are
-        # an artifact of the unweighted index over-sampling well-monitored temperate
-        # populations (see method note), so the upside is capped at flat while a gentle
-        # continued decline is allowed. Extrapolating a monitored class mean far is not
-        # defensible either way.
-        p0 = 2000 if data_end > 2000 else BASE
-        rate = (math.log10(idx[data_end]) - math.log10(idx[p0])) / (data_end - p0) if data_end > p0 else 0.0
-        rate = max(-0.010, min(0.0, rate))  # flat-to-declining only, capped at ~-2.3%/yr
-        val = idx[data_end]
-        for y in range(data_end + 1, PROJ_END + 1):
-            val *= 10 ** rate
-            idx[y] = val
-
+        values, data_end = compute_index(species)
+        # sub-population lines by system (only systems with enough species)
+        subs = []
+        sysmap = data_sys[g]
+        shades = [1.0, 0.7, 0.45]
+        for i, sysname in enumerate(SUBSYS):
+            sp = sysmap.get(sysname, {})
+            if len(sp) < SUB_MIN_SPECIES:
+                continue
+            svals, sde = compute_index(sp)
+            subs.append({
+                "key": SUB_LABEL[sysname],
+                "system": sysname,
+                "color": tint(COLORS[g], shades[i]),
+                "values": svals,
+                "observedEnd": sde,
+                "nSpecies": len(sp),
+                "nPops": sum(len(p) for p in sp.values()),
+            })
         groups_out[g] = {
             "color": COLORS[g],
-            "values": [round(idx[y], 1) for y in all_years],
+            "values": values,
             "observedEnd": data_end,
             "nSpecies": len(species),
             "nPops": sum(len(p) for p in species.values()),
+            "subgroups": subs,
         }
 
     out = {

@@ -72,7 +72,9 @@ export default function Dashboard({
   const [live, setLive] = useState(false);
   const [now, setNow] = useState(() => Date.now());
   const [scrubYear, setScrubYear] = useState(lpi.observedEnd);
-  const [chartOff, setChartOff] = useState<Record<string, boolean>>({});
+  // Click a group in the legend to FOCUS it: the chart splits that class into its
+  // per-system sub-populations (land / freshwater / marine). null = all groups.
+  const [focused, setFocused] = useState<string | null>(null);
   const [images, setImages] = useState<Record<string, string>>({});
   const [showProj, setShowProj] = useState(true);
   const [biomassView, setBiomassView] = useState<BiomassView>("Mammals only");
@@ -119,7 +121,7 @@ export default function Dashboard({
   }, []);
 
   const decorated = useMemo(() => decorate(species), [species]);
-  const chart = useMemo(() => buildChart(lpi, scrubYear, chartOff, showProj), [lpi, scrubYear, chartOff, showProj]);
+  const chart = useMemo(() => buildChart(lpi, scrubYear, focused, showProj), [lpi, scrubYear, focused, showProj]);
   const biomass = useMemo(() => biomassRows(biomassView), [biomassView]);
 
   const declining = decorated.filter((r) => r.trendLabel === "Declining").length;
@@ -303,36 +305,54 @@ export default function Dashboard({
                 in the {lpi.meta.source}. Solid is observed to {lpi.observedEnd}; dashed is a near-term trend projection to {chart.yrMax}.
               </p>
             </div>
-            <div style={{ display: "flex", alignItems: "center", gap: 8, border: "1px solid rgba(236,227,208,.2)", padding: "8px 13px", fontFamily: MONO, fontSize: 11, letterSpacing: ".05em", color: "rgba(236,227,208,.72)" }}>
-              <i className="ph-bold ph-arrows-out-line-horizontal" style={{ color: "#f04a26" }} />DRAG THE MARKER TO SCRUB ANY YEAR
+            <div style={{ display: "flex", flexDirection: "column", gap: 6, fontFamily: MONO, fontSize: 11, letterSpacing: ".05em", color: "rgba(236,227,208,.72)" }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 8, border: "1px solid rgba(236,227,208,.2)", padding: "8px 13px" }}>
+                <i className="ph-bold ph-arrows-out-line-horizontal" style={{ color: "#f04a26" }} />DRAG THE MARKER TO SCRUB ANY YEAR
+              </div>
+              <div style={{ display: "flex", alignItems: "center", gap: 8, border: "1px solid rgba(236,227,208,.2)", padding: "8px 13px" }}>
+                <i className="ph-bold ph-arrows-out" style={{ color: "#f04a26" }} />CLICK A GROUP TO SPLIT IT BY SYSTEM
+              </div>
             </div>
           </div>
 
           <div style={{ background: "#16221b", border: "1px solid rgba(236,227,208,.12)", borderRadius: 4, padding: "20px 22px 18px" }}>
-            <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginBottom: 8 }}>
-              {chart.groups.map((g) => (
-                <button
-                  key={g.key}
-                  onClick={() => setChartOff((s) => ({ ...s, [g.key]: !s[g.key] }))}
-                  style={{
-                    display: "inline-flex",
-                    alignItems: "center",
-                    gap: 7,
-                    background: g.active ? "rgba(236,227,208,.08)" : "transparent",
-                    border: g.active ? "1px solid rgba(236,227,208,.22)" : "1px solid rgba(236,227,208,.12)",
-                    borderRadius: 2,
-                    padding: "6px 11px",
-                    fontFamily: MONO,
-                    fontSize: 11,
-                    letterSpacing: ".04em",
-                    color: g.active ? "#ece3d0" : "rgba(236,227,208,.4)",
-                    cursor: "pointer",
-                  }}
-                >
-                  <span style={{ width: 14, height: 3, background: g.color, display: "inline-block" }} />
-                  {g.key}
+            <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginBottom: 8, alignItems: "center" }}>
+              {chart.groups.map((g) => {
+                const isFocused = focused === g.key;
+                const hasSubs = (lpi.groups[g.key]?.subgroups?.length ?? 0) > 0;
+                const dim = focused !== null && !isFocused;
+                return (
+                  <button
+                    key={g.key}
+                    onClick={() => setFocused((f) => (f === g.key ? null : g.key))}
+                    title={hasSubs ? `Focus ${g.key}: split into land / freshwater / marine sub-populations` : g.key}
+                    style={{
+                      display: "inline-flex",
+                      alignItems: "center",
+                      gap: 7,
+                      background: isFocused ? "rgba(236,227,208,.16)" : "rgba(236,227,208,.06)",
+                      border: isFocused ? "1px solid rgba(236,227,208,.5)" : "1px solid rgba(236,227,208,.16)",
+                      borderRadius: 2,
+                      padding: "6px 11px",
+                      fontFamily: MONO,
+                      fontSize: 11,
+                      letterSpacing: ".04em",
+                      color: dim ? "rgba(236,227,208,.4)" : "#ece3d0",
+                      cursor: "pointer",
+                    }}
+                  >
+                    <span style={{ width: 14, height: 3, background: g.color, display: "inline-block", opacity: dim ? 0.4 : 1 }} />
+                    {g.key}
+                    {hasSubs && <i className="ph-bold ph-arrows-out" style={{ fontSize: 11, opacity: 0.6 }} />}
+                  </button>
+                );
+              })}
+              {focused && (
+                <button onClick={() => setFocused(null)} title="Show all groups"
+                  style={{ display: "inline-flex", alignItems: "center", gap: 6, background: "rgba(240,74,38,.14)", border: "1px solid rgba(240,74,38,.45)", borderRadius: 2, padding: "6px 11px", fontFamily: MONO, fontSize: 11, letterSpacing: ".04em", color: "#f8a488", cursor: "pointer" }}>
+                  <i className="ph-bold ph-x" style={{ fontSize: 11 }} /> ALL GROUPS
                 </button>
-              ))}
+              )}
               <button
                 onClick={() => setShowProj((v) => !v)}
                 style={{
@@ -379,9 +399,16 @@ export default function Dashboard({
                 </text>
               ))}
               {chart.groups.map((g) => (
-                <g key={g.key}>
-                  <polyline points={g.obs} fill="none" stroke={g.color} strokeWidth={2.6} strokeLinecap="round" strokeLinejoin="round" opacity={g.opacity} />
-                  {g.proj && <polyline points={g.proj} fill="none" stroke={g.color} strokeWidth={2} strokeDasharray="3 4" strokeLinecap="round" opacity={g.projOpacity} />}
+                <g key={g.key} style={{ transition: "opacity .4s ease" }}>
+                  <polyline points={g.obs} fill="none" stroke={g.color} strokeWidth={2.6} strokeLinecap="round" strokeLinejoin="round" opacity={g.opacity} style={{ transition: "opacity .4s ease" }} />
+                  {g.proj && <polyline points={g.proj} fill="none" stroke={g.color} strokeWidth={2} strokeDasharray="3 4" strokeLinecap="round" opacity={g.projOpacity} style={{ transition: "opacity .4s ease" }} />}
+                </g>
+              ))}
+              {/* focused group's sub-population lines — animate in on focus */}
+              {chart.subLines.map((s) => (
+                <g key={s.key} className="sub-line">
+                  <polyline points={s.obs} fill="none" stroke={s.color} strokeWidth={2.8} strokeLinecap="round" strokeLinejoin="round" />
+                  {s.proj && <polyline points={s.proj} fill="none" stroke={s.color} strokeWidth={2.2} strokeDasharray="3 4" strokeLinecap="round" opacity={0.75} />}
                 </g>
               ))}
               <line x1={chart.scrubX} x2={chart.scrubX} y1={24} y2={320} stroke="#f04a26" strokeWidth={1.6} />
@@ -423,15 +450,21 @@ export default function Dashboard({
               <div style={{ fontFamily: MONO, fontWeight: 700, fontSize: 13, color: "#ece3d0" }}>
                 AT {scrubYear}{" "}
                 <span style={{ fontSize: 10, color: scrubModelled ? "#e3a63e" : "#37a99d", letterSpacing: ".08em" }}>[{scrubModelled ? "modelled" : "observed"}]</span>
+                {focused && <span style={{ fontSize: 10, color: "rgba(236,227,208,.55)", letterSpacing: ".06em" }}> · {focused.toUpperCase()} BY SYSTEM</span>}
               </div>
-              {chart.groups
-                .filter((g) => g.active)
-                .map((g) => (
-                  <div key={g.key} style={{ display: "inline-flex", alignItems: "baseline", gap: 7, fontFamily: MONO, fontSize: 12, color: "rgba(236,227,208,.7)" }}>
-                    <span style={{ width: 9, height: 9, background: g.color, display: "inline-block" }} />
-                    {g.key} <b style={{ color: "#ece3d0" }}>{Math.round(valueAt(lpi.groups[g.key].values, lpi.years, scrubYear))}</b>
-                  </div>
-                ))}
+              {focused
+                ? (lpi.groups[focused]?.subgroups ?? []).map((s) => (
+                    <div key={s.key} style={{ display: "inline-flex", alignItems: "baseline", gap: 7, fontFamily: MONO, fontSize: 12, color: "rgba(236,227,208,.7)" }}>
+                      <span style={{ width: 9, height: 9, background: s.color, display: "inline-block" }} />
+                      {s.key} <b style={{ color: "#ece3d0" }}>{Math.round(valueAt(s.values, lpi.years, scrubYear))}</b>
+                    </div>
+                  ))
+                : chart.groups.map((g) => (
+                    <div key={g.key} style={{ display: "inline-flex", alignItems: "baseline", gap: 7, fontFamily: MONO, fontSize: 12, color: "rgba(236,227,208,.7)" }}>
+                      <span style={{ width: 9, height: 9, background: g.color, display: "inline-block" }} />
+                      {g.key} <b style={{ color: "#ece3d0" }}>{Math.round(valueAt(lpi.groups[g.key].values, lpi.years, scrubYear))}</b>
+                    </div>
+                  ))}
             </div>
           </div>
 

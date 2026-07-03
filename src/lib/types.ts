@@ -49,6 +49,16 @@ export interface SpeciesPayload {
   species: Species[];
 }
 
+export interface LpiSubgroup {
+  key: string;
+  system: string;
+  color: string;
+  values: number[];
+  observedEnd: number;
+  nSpecies: number;
+  nPops: number;
+}
+
 export interface LpiGroup {
   color: string;
   values: number[];
@@ -56,6 +66,8 @@ export interface LpiGroup {
   observedEnd: number;
   nSpecies: number;
   nPops: number;
+  /** Per-system sub-population lines, revealed when the group is focused. */
+  subgroups?: LpiSubgroup[];
 }
 
 export interface LpiData {

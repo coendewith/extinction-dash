@@ -26,8 +26,9 @@ export interface SearchParams {
   groups?: string[];
   country?: string;
   measured?: boolean;
-  sort?: "severity" | "name" | "year" | "extinction";
+  sort?: "severity" | "name" | "year" | "extinction" | "group" | "population" | "trend";
   dir?: "asc" | "desc";
+  trend?: string;
   page?: number;
   pageSize?: number;
 }
@@ -70,11 +71,23 @@ export async function searchSpecies(p: SearchParams): Promise<SearchResult> {
     if (safe) params.set("or", `(scientific_name.ilike.*${safe}*,common_name.ilike.*${safe}*)`);
   }
 
-  // "extinction" sorts by the modelled risk window, which tracks the category's
-  // severity, so it maps to the severity column. Ascending = soonest projected
-  // extinction = most severe first, so the DB direction is flipped for it.
-  const sortCol = p.sort === "name" ? "scientific_name" : p.sort === "year" ? "year_published" : "severity";
-  const dir = p.dir || (p.sort === "name" ? "asc" : "desc");
+  if (p.trend) params.set("population_trend", "eq." + p.trend);
+
+  // Column each sort maps to. "extinction" uses extinction_score (severity tuned
+  // by trend, so recovering species drop to the safe end); higher score = sooner,
+  // so its DB direction is flipped to keep "ascending = soonest projected".
+  const SORT_COL: Record<string, string> = {
+    name: "scientific_name",
+    year: "year_published",
+    group: "group_name",
+    population: "population_num",
+    trend: "population_trend",
+    extinction: "extinction_score",
+    severity: "severity",
+  };
+  const sortCol = SORT_COL[p.sort || "severity"] || "severity";
+  const defaultDir = p.sort === "name" || p.sort === "group" || p.sort === "trend" || p.sort === "extinction" ? "asc" : "desc";
+  const dir = p.dir || defaultDir;
   const dbDir = p.sort === "extinction" ? (dir === "asc" ? "desc" : "asc") : dir;
   // stable secondary sort so pagination never repeats/skips rows
   params.set("order", `${sortCol}.${dbDir}${dbDir === "desc" ? ".nullslast" : ".nullsfirst"},sis_id.asc`);

@@ -35,6 +35,23 @@ a {
   background: rgba(27, 24, 19, 0.04) !important;
 }
 
+/* Sub-population lines animate in when a group is focused in the trend chart. */
+@keyframes subLineIn {
+  from {
+    opacity: 0;
+    transform: translateY(8px) scaleY(0.92);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+.sub-line {
+  animation: subLineIn 0.5s cubic-bezier(0.22, 1, 0.36, 1) both;
+  transform-box: fill-box;
+  transform-origin: center bottom;
+}
+
 .source-card {
   transition: border-color 0.15s ease;
 }
