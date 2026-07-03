@@ -1,0 +1,6 @@
+data/
+https:/
+node_modules/
+.next/
+.git/
+*.log
