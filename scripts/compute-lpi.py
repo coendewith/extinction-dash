@@ -15,8 +15,11 @@ Index method):
      as the LPI does, to stop over-monitored species dominating). Single-year
      swings are capped at +/-1 in log10 (10x), matching the LPI's cap.
   4. Chain the ratios into an index, 1970 = 100.
-  5. Project 2020 -> 2050 by continuing each group's mean 2000-2020 log-rate
-     (labelled "modelled" and drawn dashed in the UI).
+  5. Truncate each group's OBSERVED window at the last year with an adequate
+     sample (>= MIN_SPECIES contributing species). Years past that carry too
+     little data to be an honest observation, so they are not drawn as observed.
+  6. Project from each group's observed end to 2035 by continuing its recent
+     log-rate (labelled "modelled" and drawn dashed in the UI).
 
 This unweighted-by-class cut is intentionally NOT the headline WWF/ZSL figure:
 the published *weighted* global index shows a 73% decline (1970-2020) because
@@ -34,6 +37,10 @@ OUT = os.path.join(ROOT, "src", "data", "lpi.json")
 
 YEARS_IN = list(range(1950, 2021))
 BASE, OBS_END, PROJ_END = 1970, 2020, 2035
+# A year needs at least this many contributing species to count as an observation.
+# Below it, one or two populations can swing the index, so we stop the observed
+# line there and switch to a modelled projection.
+MIN_SPECIES = 3
 
 GROUP_MAP = {
     "Mammalia": "Mammals", "Aves": "Birds", "Amphibia": "Amphibians", "Reptilia": "Reptiles",
@@ -133,6 +140,7 @@ def main():
         interp = {sp: [smooth_series(s) for s in pops] for sp, pops in species.items()}
         idx = {BASE: 100.0}
         val = 100.0
+        nsp_by_year = {}
         for y in range(BASE + 1, OBS_END + 1):
             sp_dts = []
             for pops in interp.values():
@@ -142,20 +150,32 @@ def main():
                         pop_dts.append(max(-1.0, min(1.0, math.log10(s[y] / s[y - 1]))))
                 if pop_dts:
                     sp_dts.append(sum(pop_dts) / len(pop_dts))
+            nsp_by_year[y] = len(sp_dts)
             mean_dt = sum(sp_dts) / len(sp_dts) if sp_dts else 0.0
             val *= 10 ** mean_dt
             idx[y] = val
-        # near-term projection: mean annual log-rate over 2000-2020, damped.
-        # Kept short (to 2035) and tightly capped — extrapolating unweighted class
-        # means further than ~15 years is not defensible.
-        rate = (math.log10(idx[OBS_END]) - math.log10(idx[2000])) / (OBS_END - 2000)
+
+        # Observed window ends at the last adequately-sampled year. Years past it
+        # (a single-population spike, or a no-data flat tail) are not observations.
+        data_end = BASE
+        for y in range(BASE + 1, OBS_END + 1):
+            if nsp_by_year.get(y, 0) >= MIN_SPECIES:
+                data_end = y
+
+        # near-term projection from the observed end: recent log-rate, damped and
+        # tightly capped — extrapolating unweighted class means far is not defensible.
+        p0 = 2000 if data_end > 2000 else BASE
+        rate = (math.log10(idx[data_end]) - math.log10(idx[p0])) / (data_end - p0) if data_end > p0 else 0.0
         rate = max(-0.012, min(0.012, rate))  # cap at ~+/-2.8%/yr
-        for y in range(OBS_END + 1, PROJ_END + 1):
+        val = idx[data_end]
+        for y in range(data_end + 1, PROJ_END + 1):
             val *= 10 ** rate
             idx[y] = val
+
         groups_out[g] = {
             "color": COLORS[g],
             "values": [round(idx[y], 1) for y in all_years],
+            "observedEnd": data_end,
             "nSpecies": len(species),
             "nPops": sum(len(p) for p in species.values()),
         }
@@ -198,8 +218,10 @@ def main():
     print(f"Wrote {OUT}")
     print(f"  {total_pops:,} populations · {len(species_set):,} species")
     for g in ORDER:
-        v = groups_out[g]["values"]
-        print(f"  {g:11s} 1970={v[0]:.0f}  2020={v[OBS_END-BASE]:.0f}  2050={v[-1]:.0f}  (n={groups_out[g]['nPops']})")
+        go = groups_out[g]
+        v = go["values"]
+        de = go["observedEnd"]
+        print(f"  {g:11s} 1970={v[0]:.0f}  obs.end {de}={v[de-BASE]:.0f}  {PROJ_END}={v[-1]:.0f}  (n={go['nPops']})")
 
 
 if __name__ == "__main__":

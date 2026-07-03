@@ -1,5 +1,10 @@
 import type { Metadata, Viewport } from "next";
 import "./globals.css";
+// Phosphor icon fonts, self-hosted (bundled by Next) rather than fetched from a
+// no-SLA CDN at runtime. Keeps the ph / ph-bold / ph-fill class names working.
+import "@phosphor-icons/web/regular";
+import "@phosphor-icons/web/bold";
+import "@phosphor-icons/web/fill";
 
 export const metadata: Metadata = {
   metadataBase: new URL("https://extinction-dash.vercel.app"),
@@ -36,9 +41,6 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,300..800&family=Newsreader:ital,opsz,wght@0,6..72,300..600;1,6..72,300..500&family=Space+Mono:ital,wght@0,400;0,700;1,400;1,700&display=swap"
           rel="stylesheet"
         />
-        <link rel="stylesheet" href="https://unpkg.com/@phosphor-icons/web@2.1.1/src/regular/style.css" />
-        <link rel="stylesheet" href="https://unpkg.com/@phosphor-icons/web@2.1.1/src/bold/style.css" />
-        <link rel="stylesheet" href="https://unpkg.com/@phosphor-icons/web@2.1.1/src/fill/style.css" />
       </head>
       <body>{children}</body>
     </html>

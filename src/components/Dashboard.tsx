@@ -80,9 +80,9 @@ export default function Dashboard({
     fetch("/api/species")
       .then((r) => (r.ok ? r.json() : null))
       .then((j) => {
-        if (cancelled || !j?.species) return;
+        if (cancelled || !j?.species?.length) return;
         setSpecies(j.species);
-        setLive(true);
+        setLive(j.live === true);
       })
       .catch(() => {});
     return () => {
@@ -440,8 +440,8 @@ export default function Dashboard({
           {/* stat tiles */}
           <div className="stat-grid" style={{ display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: 14, marginTop: 20 }}>
             {[
-              { value: String(decorated.length), label: "SPECIES ON THE WATCHLIST", note: "IUCN-assessed", color: "#ece3d0", bg: "rgba(55,169,157,.12)", border: "#37a99d" },
-              { value: Math.round((declining / decorated.length) * 100) + "%", label: "DECLINING TREND", note: "of tracked species (measured)", color: "#f04a26", bg: "rgba(240,74,38,.12)", border: "#f04a26" },
+              { value: String(decorated.length), label: "SPECIES TRACKED", note: "IUCN-assessed", color: "#ece3d0", bg: "rgba(55,169,157,.12)", border: "#37a99d" },
+              { value: decorated.length ? Math.round((declining / decorated.length) * 100) + "%" : "—", label: "DECLINING TREND", note: "of tracked species (measured)", color: "#f04a26", bg: "rgba(240,74,38,.12)", border: "#f04a26" },
               { value: soonest, label: "NEAREST PROJECTED WINDOW", note: "Vaquita · Criterion E (modelled)", color: "#e3a63e", bg: "rgba(227,166,62,.12)", border: "#e3a63e" },
               { value: "~15×", label: "LIVESTOCK : WILD MAMMALS", note: "by biomass (Bar-On 2018)", color: "#ece3d0", bg: "rgba(176,78,111,.16)", border: "#b04e6f" },
             ].map((s) => (

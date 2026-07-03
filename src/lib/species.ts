@@ -169,12 +169,24 @@ export interface Elapsed {
   totalDays: string;
 }
 
+// Decompose an elapsed duration into whole years + day remainder using true
+// calendar (anniversary) arithmetic in UTC, not a fixed 365.25-day year — so the
+// YR/DAY split matches a real calendar rather than drifting a day per leap cycle.
+function calendarSplit(fromISO: string, now: number): { years: number; anniversaryMs: number; startMs: number; nowMs: number } {
+  const a = new Date(fromISO);
+  const startMs = a.getTime();
+  const nowMs = Math.max(startMs, now);
+  const b = new Date(nowMs);
+  let years = b.getUTCFullYear() - a.getUTCFullYear();
+  const anniv = (y: number) =>
+    Date.UTC(a.getUTCFullYear() + y, a.getUTCMonth(), a.getUTCDate(), a.getUTCHours(), a.getUTCMinutes(), a.getUTCSeconds());
+  if (anniv(years) > nowMs) years -= 1;
+  return { years, anniversaryMs: anniv(years), startMs, nowMs };
+}
+
 export function elapsed(fromISO: string, now: number): Elapsed {
-  const ms = Math.max(0, now - new Date(fromISO).getTime());
-  let s = Math.floor(ms / 1000);
-  const YR = 31557600;
-  const yr = Math.floor(s / YR);
-  s -= yr * YR;
+  const { years, anniversaryMs, startMs, nowMs } = calendarSplit(fromISO, now);
+  let s = Math.floor((nowMs - anniversaryMs) / 1000);
   const d = Math.floor(s / 86400);
   s -= d * 86400;
   const h = Math.floor(s / 3600);
@@ -182,12 +194,11 @@ export function elapsed(fromISO: string, now: number): Elapsed {
   const m = Math.floor(s / 60);
   s -= m * 60;
   const pad = (n: number) => String(n).padStart(2, "0");
-  return { years: yr, days: d, hours: pad(h), mins: pad(m), secs: pad(s), totalDays: Math.floor(ms / 86400000).toLocaleString("en-US") };
+  return { years, days: d, hours: pad(h), mins: pad(m), secs: pad(s), totalDays: Math.floor((nowMs - startMs) / 86400000).toLocaleString("en-US") };
 }
 
 export function since(fromISO: string, now: number): string {
-  const ms = Math.max(0, now - new Date(fromISO).getTime());
-  const yr = Math.floor(ms / 31557600000);
-  const d = Math.floor((ms % 31557600000) / 86400000);
-  return yr > 0 ? `${yr} yr ${d} d` : `${d} d`;
+  const { years, anniversaryMs, nowMs } = calendarSplit(fromISO, now);
+  const d = Math.floor((nowMs - anniversaryMs) / 86400000);
+  return years > 0 ? `${years} yr ${d} d` : `${d} d`;
 }

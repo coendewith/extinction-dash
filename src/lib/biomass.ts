@@ -55,7 +55,7 @@ export const composition = [
   },
   {
     label: "ALL BIRDS",
-    unit: "by number",
+    unit: "by mass",
     big: "70% poultry",
     bigPct: 70,
     wildPct: 30,

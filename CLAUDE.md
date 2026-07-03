@@ -99,6 +99,32 @@ regenerated JSON.
 - **`next@15.3.1` had a critical CVE (CVE-2025-66478)** → pinned to `15.5.20`.
   Two remaining moderate `postcss` advisories are transitive via Next and only
   "fixable" by downgrading to Next 9 (worse); not exploitable here.
+- **Sparse-data honesty (LPI):** a group's index is only drawn *observed* up to
+  its last adequately-sampled year (`observedEnd` per group, gated on
+  `MIN_SPECIES` contributing species). Amphibian data thins to ~zero after 2017,
+  so the old code held the index flat at a single-population spike (28.6) through
+  2020 and drew it solid — a fake "measurement". Now amphibians observe to 2017
+  (index 19, a real ~81% decline) and go dashed/modelled after. Any new group
+  with a thin tail is handled the same way; the chart reads `group.observedEnd`.
+- **Durations use calendar arithmetic**, not a fixed 365.25-day year — else the
+  YR/DAY split (e.g. the Vaquita countdown) drifts a day off the real calendar.
+  See `calendarSplit` in `src/lib/species.ts`.
+- **Icons are self-hosted** via `@phosphor-icons/web` (imported as
+  `@phosphor-icons/web/{regular,bold,fill}` — the package's `exports` map, NOT
+  `/src/.../style.css`, which webpack can't resolve). They were on unpkg (no
+  production SLA). **Google Fonts is intentionally kept as an external `<link>`:**
+  Google runs it as a reliable production service, and migrating to `next/font`
+  would rename the font families and break the hard-coded `font-family="Space Mono"`
+  attributes on the SVG `<text>` elements. Acceptable, deliberate trade-off.
+- **The nav LIVE/SNAPSHOT badge reads the API's `live` flag** (`j.live === true`),
+  not merely the presence of a species array — otherwise it falsely claims live
+  IUCN sync when the route served the build-time snapshot (no token / IUCN down).
+
+### Review process note
+Before the public deploy, an adversarial review workflow (4 dimensions ×
+find→verify) surfaced 19 candidates, 9 confirmed and fixed (all above). It
+confirmed the IUCN token never reaches the browser. Re-run that kind of pass
+after any substantial change.
 
 ## Deployment
 

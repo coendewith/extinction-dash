@@ -52,6 +52,8 @@ export interface SpeciesPayload {
 export interface LpiGroup {
   color: string;
   values: number[];
+  /** Last year with an adequate sample; values after this are modelled. */
+  observedEnd: number;
   nSpecies: number;
   nPops: number;
 }

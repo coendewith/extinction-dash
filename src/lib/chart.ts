@@ -59,12 +59,15 @@ export function buildChart(
   const dots: ChartGeom["dots"] = [];
   for (const [key, g] of Object.entries(lpi.groups)) {
     const active = !chartOff[key];
+    // Each group has its own observed end — sparse groups (e.g. amphibians, whose
+    // data thins out after 2017) go dashed earlier rather than faking observations.
+    const gObsEnd = g.observedEnd ?? obsEnd;
     const obs: string[] = [];
     const proj: string[] = [];
     years.forEach((yr, i) => {
       const p = `${px(yr).toFixed(1)},${py(g.values[i]).toFixed(1)}`;
-      if (yr <= obsEnd) obs.push(p);
-      if (yr >= obsEnd) proj.push(p);
+      if (yr <= gObsEnd) obs.push(p);
+      if (yr >= gObsEnd) proj.push(p);
     });
     groups.push({
       key,

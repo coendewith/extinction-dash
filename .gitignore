@@ -30,3 +30,4 @@ next-env.d.ts
 
 # stray artifact: a URL accidentally saved as a nested file path
 /https:/
+.env*
