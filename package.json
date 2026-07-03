@@ -1,0 +1,25 @@
+{
+  "name": "extinction-dash",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Sixth Mass Extinction Watch — a living record of what we are losing, built on IUCN Red List, the Living Planet Index and Bar-On et al. 2018.",
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "next lint",
+    "data": "node scripts/build-data.mjs",
+    "data:lpi": "python3 scripts/compute-lpi.py"
+  },
+  "dependencies": {
+    "next": "15.5.20",
+    "react": "19.1.0",
+    "react-dom": "19.1.0"
+  },
+  "devDependencies": {
+    "@types/node": "22.15.3",
+    "@types/react": "19.1.2",
+    "@types/react-dom": "19.1.2",
+    "typescript": "5.8.3"
+  }
+}

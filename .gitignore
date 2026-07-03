@@ -1,0 +1,32 @@
+# dependencies
+/node_modules
+/.pnp
+.pnp.*
+
+# next.js
+/.next/
+/out/
+next-env.d.ts
+
+# production
+/build
+
+# env — never commit the IUCN token
+.env
+.env*.local
+.env.local
+
+# vercel
+.vercel
+
+# misc
+.DS_Store
+*.pem
+*.tsbuildinfo
+
+# raw source data (large / redistribution-restricted) — kept locally, not in git.
+# The generated, committed data lives in src/data/*.json instead.
+/data/
+
+# stray artifact: a URL accidentally saved as a nested file path
+/https:/

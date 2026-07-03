@@ -1,0 +1,84 @@
+* {
+  box-sizing: border-box;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  margin: 0;
+  background: #efe7d6;
+  font-family: "Newsreader", Georgia, serif;
+  -webkit-font-smoothing: antialiased;
+  color: #1b1813;
+}
+
+::selection {
+  background: #d8391c;
+  color: #efe7d6;
+}
+
+input::placeholder {
+  color: #8a8069;
+}
+
+a {
+  color: inherit;
+}
+
+.navlink:hover {
+  color: #ece3d0 !important;
+}
+
+.wl-row:hover {
+  background: rgba(27, 24, 19, 0.04) !important;
+}
+
+.source-card {
+  transition: border-color 0.15s ease;
+}
+.source-card:hover {
+  border-color: rgba(240, 74, 38, 0.6) !important;
+}
+
+/* Watchlist table can be wider than a phone — let it scroll horizontally
+   inside its own container rather than breaking the page layout. */
+.wl-scroll {
+  overflow-x: auto;
+}
+.wl-min {
+  min-width: 860px;
+}
+
+@media (max-width: 900px) {
+  .hero-grid {
+    grid-template-columns: minmax(0, 1fr) !important;
+  }
+  .biomass-grid {
+    grid-template-columns: minmax(0, 1fr) !important;
+    gap: 32px !important;
+  }
+  .method-grid {
+    grid-template-columns: minmax(0, 1fr) !important;
+  }
+  .stat-grid {
+    grid-template-columns: 1fr 1fr !important;
+  }
+}
+
+@media (max-width: 560px) {
+  .stat-grid {
+    grid-template-columns: 1fr !important;
+  }
+  .detail-grid {
+    grid-template-columns: minmax(0, 1fr) !important;
+  }
+  .detail-facts {
+    grid-template-columns: 1fr !important;
+  }
+  .biomass-label {
+    width: 120px !important;
+    font-size: 12px !important;
+  }
+}
