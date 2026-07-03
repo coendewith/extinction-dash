@@ -24,22 +24,40 @@ const LPI_DRIVERS = [
   {
     group: "Amphibians", color: "#f04a26", change: "−82% since 1970", dirColor: "#f04a26",
     text: "The steepest fall of any vertebrate class. Chytrid fungus (Batrachochytrium) has swept the tropics since the 1980s, on top of wetland drainage, agrochemical pollution and a drying climate.",
+    sources: [
+      { name: "Scheele et al. 2019, Science — amphibian chytrid panzootic", url: "https://www.science.org/doi/10.1126/science.aav0379" },
+      { name: "IUCN amphibian assessment 2023, Nature", url: "https://www.nature.com/articles/s41586-023-06578-4" },
+    ],
   },
   {
     group: "Fish", color: "#37a99d", change: "−21% since 1970", dirColor: "#f04a26",
-    text: "Driven down by overfishing, dams that sever migratory rivers, and bycatch. The recent uptick is well-managed temperate stocks rebounding — freshwater and tropical fish keep falling.",
+    text: "Driven down by overfishing, dams that sever migratory rivers, and bycatch. The recent uptick reflects well-managed temperate stocks rebounding — freshwater and tropical fish keep falling.",
+    sources: [
+      { name: "FAO 2024 — State of World Fisheries (SOFIA)", url: "https://www.fao.org/publications/sofia/en" },
+      { name: "WWF/ZSL 2024 — Living Planet Report (freshwater −85%)", url: "https://www.livingplanetindex.org/" },
+    ],
   },
   {
     group: "Mammals", color: "#e3a63e", change: "−36% since 1970", dirColor: "#f04a26",
     text: "Habitat cleared for farming, plus hunting and the wildlife trade. Large-bodied mammals and populations outside protected areas have been hit hardest.",
+    sources: [
+      { name: "IPBES 2019 — Global Assessment (land-use change, exploitation)", url: "https://www.ipbes.net/global-assessment" },
+    ],
   },
   {
     group: "Birds", color: "#e8ddc4", change: "≈ flat", dirColor: "#b9ae94",
     text: "Near-flat only because the index leans on well-monitored, often protected temperate species. Farmland birds and long-distance migrants are declining sharply beneath the average.",
+    sources: [
+      { name: "BirdLife 2022 — State of the World's Birds", url: "https://www.birdlife.org/papers-reports/state-of-the-worlds-birds-2022/" },
+    ],
   },
   {
     group: "Reptiles", color: "#79bd6e", change: "+39% (sample artifact)", dirColor: "#cf8f34",
-    text: "The rise reflects a small, well-studied sample (809 populations) skewed toward recovering species like protected marine turtles. Globally, reptiles face habitat loss, climate change and the pet & skin trade.",
+    text: "The rise is a sampling artifact: reptiles are only 809 of the 34,000+ populations in this dataset (the Living Planet Database 2024), and that small sample skews toward well-monitored, recovering species such as protected marine turtles. The first global reptile assessment (Cox et al. 2022) found ~21% of reptile species are threatened.",
+    sources: [
+      { name: "Cox et al. 2022, Nature — global reptile assessment", url: "https://www.nature.com/articles/s41586-022-04664-7" },
+      { name: "Living Planet Database 2024 (this dataset — 809 reptile populations)", url: "https://www.livingplanetindex.org/" },
+    ],
   },
 ];
 
@@ -109,8 +127,21 @@ export default function Dashboard({
     const w = decorated.filter((r) => r.isWindow && r.win).sort((a, b) => a.win![0] - b.win![0])[0];
     return w?.win ? `${w.win[0]}–${w.win[1]}` : "—";
   }, [decorated]);
-  const vaquita = decorated.find((r) => r.common === "Vaquita");
-  const vaqImg = vaquita ? images[vaquita.wiki] : undefined;
+  // "Most imperilled" showcase is a logical, data-driven pick — not hardcoded:
+  // the curated species with the soonest projected window that is still
+  // declining (tie-break: smallest wild population). Updates automatically as the
+  // curated set changes. (Needs editorial fields — last-seen, window — so it is
+  // drawn from the curated watchlist, which carries them.)
+  const showcase = useMemo(() => {
+    const c = decorated.filter((r) => r.isWindow && r.win && r.trend === "down" && r.lastSeen);
+    c.sort((a, b) => {
+      const am = (a.win![0] + a.win![1]) / 2, bm = (b.win![0] + b.win![1]) / 2;
+      if (am !== bm) return am - bm;
+      return (a.popNum ?? 1e12) - (b.popNum ?? 1e12);
+    });
+    return c[0] || decorated.find((r) => r.common === "Vaquita");
+  }, [decorated]);
+  const showImg = showcase ? images[showcase.wiki] : undefined;
   const scrubModelled = scrubYear > lpi.observedEnd;
 
   // scrubber pointer handling
@@ -161,7 +192,7 @@ export default function Dashboard({
               FIELD RECORD
             </span>
           </a>
-          <div style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: 26 }}>
+          <div className="nav-links" style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: 26 }}>
             {NAV_LINKS.map(([href, label]) => (
               <a
                 key={href}
@@ -197,7 +228,7 @@ export default function Dashboard({
                 The sixth mass extinction, honestly counted
               </div>
               <h1 style={{ fontFamily: DISPLAY, fontWeight: 700, fontSize: "clamp(40px,5.4vw,70px)", lineHeight: 0.98, letterSpacing: "-.025em", margin: 0, maxWidth: "15ch" }}>
-                Life is vanishing faster than we can count it.
+                Wildlife is vanishing faster than we can count it.
               </h1>
               <p style={{ fontFamily: SERIF, fontSize: 19, lineHeight: 1.55, color: "#4f4839", maxWidth: "52ch", margin: "22px 0 0" }}>
                 Wild populations are measured only by periodic surveys, and extinction is confirmed years late. So we separate what is{" "}
@@ -222,30 +253,30 @@ export default function Dashboard({
               <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 15 }}>
                 <span style={{ fontFamily: MONO, fontWeight: 700, fontSize: 10, letterSpacing: ".18em", color: "rgba(236,227,208,.55)" }}>MOST IMPERILLED</span>
                 <span style={{ display: "inline-flex", alignItems: "center", gap: 6, background: "rgba(240,74,38,.16)", border: "1px solid rgba(240,74,38,.5)", color: "#f8a488", fontFamily: MONO, fontWeight: 700, fontSize: 10, letterSpacing: ".1em", padding: "3px 8px", borderRadius: 2 }}>
-                  <span style={{ width: 5, height: 5, background: "#f04a26" }} />CR
+                  <span style={{ width: 5, height: 5, background: "#f04a26" }} />{showcase?.status || "CR"}
                 </span>
               </div>
               <div style={{ display: "flex", gap: 14, alignItems: "center" }}>
                 <div style={{ width: 64, height: 64, flex: "none", background: "#0f1712", border: "1px solid rgba(236,227,208,.14)", borderRadius: 3, overflow: "hidden", display: "flex", alignItems: "center", justifyContent: "center" }}>
-                  {vaqImg ? (
+                  {showImg ? (
                     // eslint-disable-next-line @next/next/no-img-element
-                    <img src={vaqImg} alt="Vaquita" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+                    <img src={showImg} alt={showcase?.common || ""} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
                   ) : (
-                    <i className="ph ph-waves" style={{ fontSize: 26, color: "rgba(55,169,157,.6)" }} />
+                    <i className={"ph " + (showcase?.groupIcon || "ph-waves")} style={{ fontSize: 26, color: "rgba(55,169,157,.6)" }} />
                   )}
                 </div>
                 <div style={{ minWidth: 0 }}>
-                  <div style={{ fontFamily: DISPLAY, fontWeight: 700, fontSize: 24, lineHeight: 1 }}>Vaquita</div>
-                  <div style={{ fontFamily: SERIF, fontStyle: "italic", fontSize: 14, color: "rgba(236,227,208,.6)" }}>Phocoena sinus</div>
-                  <div style={{ fontFamily: MONO, fontSize: 10.5, color: "rgba(236,227,208,.55)", marginTop: 3 }}>~10 LEFT / GULF OF CALIFORNIA</div>
+                  <div style={{ fontFamily: DISPLAY, fontWeight: 700, fontSize: 24, lineHeight: 1 }}>{showcase?.common || "Vaquita"}</div>
+                  <div style={{ fontFamily: SERIF, fontStyle: "italic", fontSize: 14, color: "rgba(236,227,208,.6)" }}>{showcase?.sci || "Phocoena sinus"}</div>
+                  <div style={{ fontFamily: MONO, fontSize: 10.5, color: "rgba(236,227,208,.55)", marginTop: 3, textTransform: "uppercase" }}>{showcase?.pop || "~10"} LEFT / {showcase?.region || "Gulf of California"}</div>
                 </div>
               </div>
               <div style={{ fontFamily: MONO, fontWeight: 700, fontSize: 9, letterSpacing: ".14em", color: "#f04a26", marginTop: 18 }}>MEASURED / SINCE LAST CONFIRMED SIGHTING</div>
-              <Countdown fromISO="2023-05-26T12:00:00Z" now={now} />
+              <Countdown fromISO={(showcase?.lastSeen || "2023-05-26") + "T12:00:00Z"} now={now} />
               <div style={{ marginTop: 16, paddingTop: 14, borderTop: "1px solid rgba(236,227,208,.16)", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
                 <div>
                   <div style={{ fontFamily: MONO, fontWeight: 700, fontSize: 9, letterSpacing: ".14em", color: "#e3a63e" }}>MODELLED WINDOW</div>
-                  <div style={{ fontFamily: DISPLAY, fontWeight: 700, fontSize: 21, marginTop: 2, letterSpacing: "-.01em" }}>{vaquita?.winText || "2026–2032"}</div>
+                  <div style={{ fontFamily: DISPLAY, fontWeight: 700, fontSize: 21, marginTop: 2, letterSpacing: "-.01em" }}>{showcase?.winText || "2026–2032"}</div>
                 </div>
                 <a href="#watchlist" style={{ display: "inline-flex", alignItems: "center", gap: 6, fontFamily: MONO, fontWeight: 700, fontSize: 10.5, letterSpacing: ".06em", color: "#f04a26", textDecoration: "none" }}>
                   FULL LIST <i className="ph-bold ph-arrow-down" />
@@ -419,7 +450,7 @@ export default function Dashboard({
             {[
               { value: String(decorated.length), label: "SPECIES TRACKED", note: "IUCN-assessed", color: "#ece3d0", bg: "rgba(55,169,157,.12)", border: "#37a99d" },
               { value: decorated.length ? Math.round((declining / decorated.length) * 100) + "%" : "—", label: "DECLINING TREND", note: "of tracked species (measured)", color: "#f04a26", bg: "rgba(240,74,38,.12)", border: "#f04a26" },
-              { value: soonest, label: "NEAREST PROJECTED WINDOW", note: "Vaquita · Criterion E (modelled)", color: "#e3a63e", bg: "rgba(227,166,62,.12)", border: "#e3a63e" },
+              { value: soonest, label: "NEAREST PROJECTED WINDOW", note: `${showcase?.common || "Vaquita"} · Criterion E (modelled)`, color: "#e3a63e", bg: "rgba(227,166,62,.12)", border: "#e3a63e" },
               { value: "~15×", label: "LIVESTOCK : WILD MAMMALS", note: "by biomass (Bar-On 2018)", color: "#ece3d0", bg: "rgba(176,78,111,.16)", border: "#b04e6f" },
             ].map((s) => (
               <div key={s.label} style={{ background: s.bg, border: `1px solid ${s.border}`, borderTop: `3px solid ${s.border}`, borderRadius: 3, padding: "18px 20px" }}>
@@ -446,6 +477,14 @@ export default function Dashboard({
                       <span style={{ fontFamily: MONO, fontWeight: 700, fontSize: 11, color: d.dirColor }}>{d.change}</span>
                     </div>
                     <div style={{ fontFamily: SERIF, fontSize: 13.5, lineHeight: 1.5, color: "rgba(236,227,208,.72)", marginTop: 2 }}>{d.text}</div>
+                    <div style={{ display: "flex", flexWrap: "wrap", gap: "3px 12px", marginTop: 6 }}>
+                      {d.sources.map((s) => (
+                        <a key={s.url} href={s.url} target="_blank" rel="noopener noreferrer" title={s.name}
+                          style={{ display: "inline-flex", alignItems: "center", gap: 4, fontFamily: MONO, fontSize: 10, letterSpacing: ".02em", color: "#8fb9b1", textDecoration: "none", borderBottom: "1px solid rgba(55,169,157,.4)", paddingBottom: 1 }}>
+                          {s.name.split(" — ")[0].split(",")[0]} <i className="ph ph-arrow-up-right" style={{ fontSize: 10 }} />
+                        </a>
+                      ))}
+                    </div>
                   </div>
                 </div>
               ))}

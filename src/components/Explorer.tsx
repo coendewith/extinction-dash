@@ -115,7 +115,7 @@ export default function Explorer({ curated }: { curated: Species[] }) {
   const [group, setGroup] = useState<string>("");
   const [country, setCountry] = useState<string>("");
   const [measured, setMeasured] = useState(true); // default: only species with real IUCN-measured data
-  const [sort, setSort] = useState<"severity" | "name" | "year">("severity");
+  const [sort, setSort] = useState<"severity" | "name" | "year" | "extinction">("severity");
   const [dir, setDir] = useState<"asc" | "desc">("desc");
   const [page, setPage] = useState(1);
   const pageSize = 50;
@@ -198,10 +198,27 @@ export default function Explorer({ curated }: { curated: Species[] }) {
         .then((j) => {
           if (cancelled) return;
           const info: WikiInfo = { loaded: true };
+          // Wikipedia often redirects a scientific name to a broader article
+          // (e.g. Sus bucculentus → "Wild boar" / Sus scrofa). Only trust the
+          // result if it actually matches THIS species — the article title is the
+          // binomial, or the extract mentions the binomial / species epithet —
+          // otherwise we'd show the wrong animal's photo, name and text.
           if (j && j.type !== "disambiguation") {
-            info.title = j.title;
-            info.img = j.thumbnail?.source || j.originalimage?.source;
-            info.extract = j.extract;
+            const parts = key.toLowerCase().split(/\s+/);
+            const genus = parts[0] || "", epithet = parts[1] || "";
+            const title = (j.title || "").toLowerCase();
+            const canon = (j.titles?.canonical || "").toLowerCase().replace(/_/g, " ");
+            const extract = (j.extract || "").toLowerCase();
+            const epithetRe = epithet ? new RegExp("\\b" + epithet.replace(/[.*+?^${}()|[\]\\]/g, "") + "\\b") : null;
+            const matches =
+              title === key.toLowerCase() ||
+              canon === key.toLowerCase() ||
+              (!!epithet && (extract.includes(genus + " " + epithet) || (!!epithetRe && epithetRe.test(extract))));
+            if (matches) {
+              info.title = j.title;
+              info.img = j.thumbnail?.source || j.originalimage?.source;
+              info.extract = j.extract;
+            }
           }
           setWiki((prev) => ({ ...prev, [key]: info }));
         })
@@ -225,11 +242,11 @@ export default function Explorer({ curated }: { curated: Species[] }) {
       const same = prev.size === p.length && p.every((c) => prev.has(c));
       return same ? new Set() : new Set(p);
     });
-  const clickSort = (key: "severity" | "name" | "year") => {
+  const clickSort = (key: "severity" | "name" | "year" | "extinction") => {
     if (sort === key) setDir((d) => (d === "asc" ? "desc" : "asc"));
     else {
       setSort(key);
-      setDir(key === "name" ? "asc" : "desc");
+      setDir(key === "name" || key === "extinction" ? "asc" : "desc");
     }
   };
 
@@ -238,7 +255,7 @@ export default function Explorer({ curated }: { curated: Species[] }) {
     active
       ? { background: "#1b1813", color: "#efe7d6", border: "1px solid #1b1813" }
       : { background: "transparent", color: "#4f4839", border: "1px solid rgba(27,24,19,.22)" };
-  const GRID = "34px minmax(128px,1fr) 74px 76px 120px 148px 44px 22px";
+  const H: React.CSSProperties = { fontFamily: MONO, fontWeight: 700, fontSize: 9.5, letterSpacing: ".1em", color: "#8a8069" };
 
   const commonName = (r: SpeciesRow) => {
     const w = wiki[r.scientific_name];
@@ -368,19 +385,18 @@ export default function Explorer({ curated }: { curated: Species[] }) {
         )}
 
         {/* table */}
-        <div style={{ background: "#f6f0e2", border: "1px solid rgba(27,24,19,.18)", borderRadius: 4, overflow: "hidden", marginTop: 16 }}>
-          <div style={{ overflowX: "auto" }}>
-            <div style={{ minWidth: 880 }}>
-              <div style={{ display: "grid", gridTemplateColumns: GRID, gap: 12, padding: "13px 22px", background: "rgba(27,24,19,.06)", alignItems: "center", borderBottom: "1px solid rgba(27,24,19,.14)" }}>
-                <div style={{ fontFamily: MONO, fontWeight: 700, fontSize: 9.5, letterSpacing: ".1em", color: "#8a8069" }}>#</div>
-                <SortHead label="SPECIES" active={sort === "name"} dir={dir} onClick={() => clickSort("name")} />
-                <div style={{ fontFamily: MONO, fontWeight: 700, fontSize: 9.5, letterSpacing: ".1em", color: "#8a8069" }}>GROUP</div>
-                <SortHead label="RISK" active={sort === "severity"} dir={dir} onClick={() => clickSort("severity")} />
-                <div style={{ fontFamily: MONO, fontWeight: 700, fontSize: 9.5, letterSpacing: ".1em", color: "#8a8069" }} title="Modelled risk window from IUCN category + trend. Ranked by RISK.">EST. EXTINCTION</div>
-                <div style={{ fontFamily: MONO, fontWeight: 700, fontSize: 9.5, letterSpacing: ".1em", color: "#8a8069" }}>TREND / ABUNDANCE</div>
-                <SortHead label="ASSESSED" active={sort === "year"} dir={dir} onClick={() => clickSort("year")} />
-                <div />
-              </div>
+        <div className="wl-card">
+          <div className="wl-head wl-grid">
+            <div style={H}>#</div>
+            <SortHead label="SPECIES" active={sort === "name"} dir={dir} onClick={() => clickSort("name")} />
+            <div className="wl-c-group" style={H}>GROUP</div>
+            <SortHead label="RISK" active={sort === "severity"} dir={dir} onClick={() => clickSort("severity")} />
+            <div className="wl-c-pop" style={H}>POPULATION</div>
+            <SortHead label="EST. EXTINCTION" active={sort === "extinction"} dir={dir} onClick={() => clickSort("extinction")} />
+            <div className="wl-c-trend" style={H}>TREND</div>
+            <SortHead className="wl-c-assessed" label="ASSESSED" active={sort === "year"} dir={dir} onClick={() => clickSort("year")} />
+            <div />
+          </div>
 
               {loading && rows.length === 0 && (
                 <div style={{ padding: "40px 22px", textAlign: "center", fontFamily: MONO, fontSize: 12, color: "#8a8069" }}>Loading species…</div>
@@ -392,13 +408,26 @@ export default function Explorer({ curated }: { curated: Species[] }) {
                 const cn = commonName(r);
                 const expandedRow = expanded === r.sis_id;
                 const rank = (page - 1) * pageSize + i + 1;
+                const t = trendInfo(r.category, r.population_trend);
+                const cur = curatedBySis.get(r.sis_id);
+                const popText = cur?.pop || r.population_size || "—";
+                // Projected extinction: curated precise window, else modelled range.
+                let estMain = "—", estSub = "", estColor = "#8a8069", estTitle = "";
+                if (cur?.kind === "window" && cur.win) {
+                  estMain = "≈" + Math.round((cur.win[0] + cur.win[1]) / 2);
+                  estSub = `${cur.win[0]}–${cur.win[1]}`;
+                  estColor = "#c23417";
+                  estTitle = "Curated Criterion E projected window";
+                } else {
+                  const p = projectionFor(r.category, r.population_trend, r.population_size);
+                  estMain = p.label;
+                  estSub = p.sub;
+                  estColor = p.color;
+                  estTitle = p.kind === "window" ? "Modelled risk window — IUCN category + trend (indicative range)" : "";
+                }
                 return (
                   <div key={r.sis_id} style={{ borderTop: "1px solid rgba(27,24,19,.09)" }}>
-                    <div
-                      onClick={() => setExpanded((id) => (id === r.sis_id ? null : r.sis_id))}
-                      className="wl-row"
-                      style={{ display: "grid", gridTemplateColumns: GRID, gap: 12, alignItems: "center", padding: "10px 22px", cursor: "pointer", background: expandedRow ? "rgba(27,24,19,.05)" : "transparent" }}
-                    >
+                    <div onClick={() => setExpanded((id) => (id === r.sis_id ? null : r.sis_id))} className="wl-row wl-grid" style={{ background: expandedRow ? "rgba(27,24,19,.05)" : "transparent" }}>
                       <div style={{ fontFamily: MONO, fontWeight: 700, fontSize: 13, color: "#b9ae94" }}>{rank}</div>
                       <div style={{ display: "flex", alignItems: "center", gap: 11, minWidth: 0 }}>
                         <div style={{ width: 38, height: 38, flex: "none", borderRadius: 3, overflow: "hidden", background: "#16221b", border: "1px solid rgba(27,24,19,.12)", display: "flex", alignItems: "center", justifyContent: "center" }}>
@@ -416,71 +445,42 @@ export default function Explorer({ curated }: { curated: Species[] }) {
                           {cn && <div style={{ fontFamily: SERIF, fontStyle: "italic", fontSize: 12.5, color: "#8a8069", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{r.scientific_name}</div>}
                         </div>
                       </div>
-                      <div style={{ fontFamily: MONO, fontSize: 11, letterSpacing: ".02em", color: "#4f4839", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{r.group_name}</div>
+                      <div className="wl-c-group" style={{ fontFamily: MONO, fontSize: 11, letterSpacing: ".02em", color: "#4f4839", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{r.group_name}</div>
                       <div>
                         <span style={{ display: "inline-flex", alignItems: "center", gap: 6, background: st.bg, padding: "4px 8px", borderRadius: 2 }}>
                           <span style={{ width: 6, height: 6, background: st.dot, flex: "none" }} />
                           <span style={{ fontFamily: MONO, fontWeight: 700, fontSize: 10.5, color: "#1b1813" }}>{r.category}</span>
                         </span>
                       </div>
-                      {(() => {
-                        const cur = curatedBySis.get(r.sis_id);
-                        if (cur?.kind === "window" && cur.win) {
-                          const mid = Math.round((cur.win[0] + cur.win[1]) / 2);
-                          return (
-                            <div title="Curated Criterion E projected window">
-                              <div style={{ fontFamily: MONO, fontWeight: 700, fontSize: 13, color: "#c23417" }}>≈{mid}</div>
-                              <div style={{ fontFamily: MONO, fontSize: 9, color: "#8a8069" }}>{cur.win[0]}–{cur.win[1]}</div>
-                            </div>
-                          );
-                        }
-                        const p = projectionFor(r.category, r.population_trend, r.population_size);
-                        if (p.kind === "window") {
-                          return (
-                            <div title="Modelled risk window — from IUCN category + trend (indicative range)">
-                              <div style={{ fontFamily: MONO, fontWeight: 700, fontSize: 13, color: p.color }}>{p.label}</div>
-                              <div style={{ fontFamily: MONO, fontSize: 9, color: "#8a8069" }}>{p.sub}</div>
-                            </div>
-                          );
-                        }
-                        return (
-                          <div>
-                            <div style={{ fontFamily: MONO, fontWeight: 700, fontSize: 11.5, color: p.color }}>{p.label === "—" ? "—" : p.label}</div>
-                            <div style={{ fontFamily: MONO, fontSize: 9, color: "#8a8069" }}>{p.sub}</div>
-                          </div>
-                        );
-                      })()}
-                      {(() => {
-                        const t = trendInfo(r.category, r.population_trend);
-                        return (
-                          <div style={{ display: "flex", alignItems: "center", gap: 8, minWidth: 0 }}>
-                            <div style={{ display: "flex", alignItems: "center", gap: 4, fontFamily: MONO, fontSize: 10.5, color: t.color, flex: "none", width: 74 }} title={t.measured ? "Measured IUCN population trend" : "Illustrative — by IUCN category"}>
-                              <i className={"ph-bold " + t.icon} style={{ fontSize: 14 }} />
-                              {t.label}
-                              {!t.measured && <span style={{ color: "#b9ae94", fontSize: 12, lineHeight: 1 }} title="illustrative by category">·</span>}
-                            </div>
-                            <svg viewBox="0 0 176 46" style={{ width: "100%", maxWidth: 92, height: 18, display: "block" }}>
-                              <polyline points={t.spark.obs} fill="none" stroke={t.color} strokeWidth={3} strokeLinecap="round" strokeLinejoin="round" opacity={t.measured ? 1 : 0.7} />
-                              <polyline points={t.spark.proj} fill="none" stroke={t.color} strokeWidth={2.5} strokeDasharray="3 3" opacity={0.5} strokeLinecap="round" />
-                            </svg>
-                          </div>
-                        );
-                      })()}
-                      <div style={{ fontFamily: MONO, fontSize: 12, color: "#4f4839" }}>{r.year_published || "—"}</div>
+                      <div className="wl-c-pop" style={{ fontFamily: MONO, fontSize: 11, color: "#4f4839", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }} title={popText}>{popText}</div>
+                      <div title={estTitle}>
+                        <div style={{ display: "flex", alignItems: "baseline", gap: 6 }}>
+                          <span style={{ fontFamily: MONO, fontWeight: 700, fontSize: 13, color: estColor }}>{estMain}</span>
+                          {estSub && <span style={{ fontFamily: MONO, fontSize: 9, color: "#8a8069", whiteSpace: "nowrap" }}>{estSub}</span>}
+                        </div>
+                        <svg className="wl-spark" viewBox="0 0 176 46" style={{ width: "100%", maxWidth: 150, height: 15, display: "block", marginTop: 3 }}>
+                          <polyline points={t.spark.obs} fill="none" stroke={t.color} strokeWidth={3} strokeLinecap="round" strokeLinejoin="round" opacity={t.measured ? 1 : 0.7} />
+                          <polyline points={t.spark.proj} fill="none" stroke={t.color} strokeWidth={2.5} strokeDasharray="3 3" opacity={0.5} strokeLinecap="round" />
+                        </svg>
+                      </div>
+                      <div className="wl-c-trend" style={{ display: "flex", alignItems: "center", gap: 4, fontFamily: MONO, fontSize: 10.5, color: t.color, minWidth: 0 }} title={t.measured ? "Measured IUCN population trend" : "Illustrative — by IUCN category"}>
+                        <i className={"ph-bold " + t.icon} style={{ fontSize: 14, flex: "none" }} />
+                        <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{t.label}</span>
+                        {!t.measured && <span style={{ color: "#b9ae94", fontSize: 12, lineHeight: 1, flex: "none" }} title="illustrative by category">·</span>}
+                      </div>
+                      <div className="wl-c-assessed" style={{ fontFamily: MONO, fontSize: 12, color: "#4f4839" }}>{r.year_published || "—"}</div>
                       <div style={{ display: "flex", justifyContent: "center" }}>
                         <i className={expandedRow ? "ph ph-caret-up" : "ph ph-caret-down"} style={{ fontSize: 16, color: "#8a8069" }} />
                       </div>
                     </div>
-                    {expandedRow && <Detail r={r} wiki={w} curated={curatedBySis.get(r.sis_id)} now={now} />}
+                    {expandedRow && <Detail r={r} wiki={w} curated={cur} now={now} />}
                   </div>
                 );
               })}
 
-              {!loading && rows.length === 0 && configured && (
-                <div style={{ padding: "34px 22px", textAlign: "center", fontFamily: SERIF, color: "#8a8069", fontSize: 15, borderTop: "1px solid rgba(27,24,19,.09)" }}>No species match these filters.</div>
-              )}
-            </div>
-          </div>
+          {!loading && rows.length === 0 && configured && (
+            <div style={{ padding: "34px 22px", textAlign: "center", fontFamily: SERIF, color: "#8a8069", fontSize: 15, borderTop: "1px solid rgba(27,24,19,.09)" }}>No species match these filters.</div>
+          )}
         </div>
 
         {/* pagination */}
@@ -506,11 +506,15 @@ export default function Explorer({ curated }: { curated: Species[] }) {
   );
 }
 
-function SortHead({ label, active, dir, onClick }: { label: string; active: boolean; dir: string; onClick: () => void }) {
+function SortHead({ label, active, dir, onClick, className }: { label: string; active: boolean; dir: string; onClick: () => void; className?: string }) {
   return (
-    <button onClick={onClick} style={{ display: "flex", alignItems: "center", gap: 4, background: "none", border: "none", padding: 0, cursor: "pointer", fontFamily: MONO, fontWeight: 700, fontSize: 9.5, letterSpacing: ".1em", color: active ? "#1b1813" : "#8a8069", textAlign: "left" }}>
+    <button className={className} onClick={onClick} title={`Sort by ${label.toLowerCase()}`} style={{ display: "flex", alignItems: "center", gap: 4, background: "none", border: "none", padding: 0, cursor: "pointer", fontFamily: MONO, fontWeight: 700, fontSize: 9.5, letterSpacing: ".1em", color: active ? "#1b1813" : "#8a8069", textAlign: "left" }}>
       {label}
-      {active && <i className={dir === "desc" ? "ph-bold ph-caret-down" : "ph-bold ph-caret-up"} style={{ fontSize: 11 }} />}
+      {active ? (
+        <i className={dir === "desc" ? "ph-bold ph-caret-down" : "ph-bold ph-caret-up"} style={{ fontSize: 11, color: "#d8391c" }} />
+      ) : (
+        <i className="ph-bold ph-caret-up-down" style={{ fontSize: 11, color: "#b9ae94" }} />
+      )}
     </button>
   );
 }
@@ -532,11 +536,32 @@ function Detail({ r, wiki, curated, now }: { r: SpeciesRow; wiki?: WikiInfo; cur
   const wikiUrl = "https://en.wikipedia.org/wiki/" + encodeURIComponent((wiki?.title || r.scientific_name).replace(/ /g, "_"));
   const gbifUrl = "https://www.gbif.org/species/search?q=" + encodeURIComponent(r.scientific_name);
   const iucnUrl = r.url || `https://www.iucnredlist.org/species/${r.sis_id}`;
+  const t = trendInfo(r.category, r.population_trend);
+  const proj = projectionFor(r.category, r.population_trend, r.population_size);
+  const measured = !!r.population_trend;
+
+  // Right-hand projection box: curated precise window > modelled range > status.
+  let boxKicker = "MODELLED / PROJECTED WINDOW", boxKickerColor = "#e3a63e", boxBig = "", boxNote = "";
+  if (curated?.kind === "window" && curated.win) {
+    boxBig = `${curated.win[0]}\u2013${curated.win[1]}`;
+    boxNote = curated.conf || "Curated Criterion E window.";
+  } else if (proj.kind === "window") {
+    boxKicker = "MODELLED / RISK WINDOW";
+    boxBig = `${proj.lo}\u2013${proj.beyond ? "2130+" : proj.hi}`;
+    boxNote = `Indicative horizon from the ${st.full} category${measured ? " and measured trend" : ""} \u2014 not a dated per-species projection.`;
+  } else {
+    boxKicker = "STATUS";
+    boxKickerColor = "#8a8069";
+    boxBig = proj.kind === "extinct" ? "Extinct" : proj.kind === "ew" ? "Extinct in the wild" : "Not projected";
+    boxNote = proj.kind === "none" && r.category === "DD" ? "Data deficient \u2014 too little known to assess extinction risk." : proj.kind === "none" ? "Lower-risk category \u2014 no extinction window projected." : "";
+  }
+
   return (
     <div style={{ padding: "4px 22px 26px", background: "rgba(27,24,19,.035)" }}>
-      <div className="detail-grid" style={{ display: "grid", gridTemplateColumns: "200px minmax(0,1fr)", gap: 26, alignItems: "start", paddingTop: 18 }}>
-        <div>
-          <div style={{ width: 200, maxWidth: "100%", height: 150, borderRadius: 3, background: "#16221b", border: "1px solid rgba(27,24,19,.12)", position: "relative", overflow: "hidden", display: "flex", alignItems: "flex-end", padding: 10 }}>
+      <div className="detail-grid" style={{ display: "grid", gridTemplateColumns: "180px minmax(0,1fr) 236px", gap: 26, alignItems: "start", paddingTop: 18 }}>
+        {/* col 1 — photo + links */}
+        <div className="detail-photo">
+          <div style={{ width: "100%", height: 150, borderRadius: 3, background: "#16221b", border: "1px solid rgba(27,24,19,.12)", position: "relative", overflow: "hidden", display: "flex", alignItems: "flex-end", padding: 10 }}>
             {wiki?.img ? (
               // eslint-disable-next-line @next/next/no-img-element
               <img src={wiki.img} alt={r.scientific_name} style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover" }} />
@@ -547,6 +572,7 @@ function Detail({ r, wiki, curated, now }: { r: SpeciesRow; wiki?: WikiInfo; cur
               </>
             )}
           </div>
+          {wiki?.img && <div style={{ fontFamily: MONO, fontSize: 8.5, letterSpacing: ".04em", color: "#8a8069", marginTop: 5 }}>PHOTO / WIKIMEDIA COMMONS</div>}
           <div style={{ display: "flex", flexWrap: "wrap", gap: 12, marginTop: 9 }}>
             <a href={wikiUrl} target="_blank" rel="noopener noreferrer" style={linkStyle}>WIKIPEDIA <i className="ph ph-arrow-square-out" style={{ fontSize: 12 }} /></a>
             <a href={iucnUrl} target="_blank" rel="noopener noreferrer" style={linkStyle}>IUCN <i className="ph ph-arrow-square-out" style={{ fontSize: 12 }} /></a>
@@ -554,86 +580,55 @@ function Detail({ r, wiki, curated, now }: { r: SpeciesRow; wiki?: WikiInfo; cur
           </div>
         </div>
 
-        <div>
-          <div style={{ display: "flex", flexWrap: "wrap", gap: "14px 30px", marginBottom: wiki?.extract || curated ? 14 : 0 }}>
-            <Fact label="IUCN STATUS">{st.full}</Fact>
-            <Fact label="GROUP">{r.group_name}</Fact>
-            <Fact label="ASSESSED">{r.year_published || "—"}</Fact>
-            {(() => {
-              const t = trendInfo(r.category, r.population_trend);
-              return (
-                <div>
-                  <div style={{ fontFamily: MONO, fontWeight: 700, fontSize: 9.5, letterSpacing: ".1em", color: "#8a8069" }}>
-                    POPULATION TREND {t.measured ? "" : "(illustrative)"}
-                  </div>
-                  <div style={{ display: "flex", alignItems: "center", gap: 10, marginTop: 4 }}>
-                    <span style={{ display: "inline-flex", alignItems: "center", gap: 5, fontFamily: SERIF, fontSize: 15, color: t.color }}>
-                      <i className={"ph-bold " + t.icon} style={{ fontSize: 15 }} />{t.label}
-                    </span>
-                    <svg viewBox="0 0 176 46" style={{ width: 90, height: 22, display: "block" }}>
-                      <polyline points={t.spark.obs} fill="none" stroke={t.color} strokeWidth={3} strokeLinecap="round" strokeLinejoin="round" opacity={t.measured ? 1 : 0.7} />
-                      <polyline points={t.spark.proj} fill="none" stroke={t.color} strokeWidth={2.5} strokeDasharray="3 3" opacity={0.5} />
-                    </svg>
-                  </div>
-                </div>
-              );
-            })()}
+        {/* col 2 — facts + notes */}
+        <div className="detail-main">
+          <div className="detail-facts" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "16px 22px" }}>
             {curated?.region && <Fact label="REGION">{curated.region}</Fact>}
-            {curated?.pop && <Fact label="EST. WILD POPULATION">{curated.pop}</Fact>}
-            {!curated?.pop && r.population_size && <Fact label="POPULATION SIZE">{r.population_size} <span style={{ color: "#8a8069" }}>mature individuals</span></Fact>}
+            <Fact label="EST. WILD POPULATION">{curated?.pop || r.population_size || "Not published"}{(curated?.pop || r.population_size) ? <span style={{ color: "#8a8069" }}> (measured)</span> : null}</Fact>
             {curated?.lastSeen && (
-              <Fact label="SINCE LAST SIGHTING">
-                {since(curated.lastSeen, now)} ago <span style={{ color: "#8a8069" }}>· {ymd(curated.lastSeen)}</span>
+              <Fact label="MEASURED / SINCE LAST SIGHTING">
+                <span style={{ fontFamily: MONO, fontWeight: 700 }}>{since(curated.lastSeen, now)} ago</span>
+                <div style={{ fontFamily: SERIF, fontSize: 13, color: "#8a8069" }}>last seen {ymd(curated.lastSeen)}</div>
               </Fact>
             )}
+            <Fact label="IUCN STATUS">{st.full}{curated?.critE ? " \u00b7 Criterion E" : ""}</Fact>
+            <Fact label="GROUP">{r.group_name}</Fact>
+            <Fact label="ASSESSED">{r.year_published || "\u2014"}</Fact>
+            <div>
+              <div style={{ fontFamily: MONO, fontWeight: 700, fontSize: 9.5, letterSpacing: ".1em", color: "#8a8069" }}>POPULATION TREND {measured ? "" : "(illustrative)"}</div>
+              <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 4 }}>
+                <span style={{ display: "inline-flex", alignItems: "center", gap: 5, fontFamily: SERIF, fontSize: 15, color: t.color }}>
+                  <i className={"ph-bold " + t.icon} style={{ fontSize: 15 }} />{t.label}
+                </span>
+              </div>
+            </div>
           </div>
-          {curated?.kind === "window" && curated.win && (
-            <div style={{ display: "inline-block", background: "#16221b", borderRadius: 4, padding: "12px 16px", color: "#ece3d0", marginBottom: 12 }}>
-              <div style={{ fontFamily: MONO, fontWeight: 700, fontSize: 9.5, letterSpacing: ".12em", color: "#e3a63e" }}>MODELLED / PROJECTED WINDOW</div>
-              <div style={{ fontFamily: DISPLAY, fontWeight: 700, fontSize: 22, marginTop: 2 }}>{curated.win[0]}–{curated.win[1]}</div>
-              {curated.conf && <div style={{ fontFamily: SERIF, fontSize: 12, color: "rgba(236,227,208,.62)", marginTop: 2 }}>{curated.conf}</div>}
-            </div>
-          )}
           {r.population_summary && (
-            <div style={{ marginBottom: 12 }}>
+            <div style={{ marginTop: 16 }}>
               <div style={{ fontFamily: MONO, fontWeight: 700, fontSize: 9.5, letterSpacing: ".1em", color: "#d8391c" }}>IUCN POPULATION NOTE</div>
-              <p style={{ fontFamily: SERIF, fontSize: 14, lineHeight: 1.55, color: "#4f4839", margin: "4px 0 0", maxWidth: "72ch" }}>{r.population_summary}</p>
+              <p style={{ fontFamily: SERIF, fontSize: 14, lineHeight: 1.55, color: "#4f4839", margin: "4px 0 0", maxWidth: "70ch" }}>{r.population_summary}</p>
             </div>
           )}
-          {!curated && (() => {
-            const p = projectionFor(r.category, r.population_trend, r.population_size);
-            const measured = !!r.population_trend;
-            if (p.kind === "window") {
-              return (
-                <div style={{ marginBottom: 12 }}>
-                  <div style={{ display: "inline-block", background: "#16221b", borderRadius: 4, padding: "12px 16px", color: "#ece3d0" }}>
-                    <div style={{ fontFamily: MONO, fontWeight: 700, fontSize: 9.5, letterSpacing: ".12em", color: "#e3a63e" }}>MODELLED / RISK WINDOW</div>
-                    <div style={{ fontFamily: DISPLAY, fontWeight: 700, fontSize: 22, marginTop: 2 }}>{p.lo}&ndash;{p.beyond ? "2130+" : p.hi}</div>
-                    <div style={{ fontFamily: SERIF, fontSize: 12, color: "rgba(236,227,208,.62)", marginTop: 2, maxWidth: "42ch" }}>
-                      Indicative horizon from the {st.full} risk category{measured ? " and measured trend" : ""} &mdash; not a dated per-species projection.
-                    </div>
-                  </div>
-                </div>
-              );
-            }
-            if (p.kind === "extinct" || p.kind === "ew") {
-              return (
-                <div style={{ display: "inline-block", background: "#16221b", borderRadius: 4, padding: "12px 16px", color: "#ece3d0", marginBottom: 12 }}>
-                  <div style={{ fontFamily: MONO, fontWeight: 700, fontSize: 9.5, letterSpacing: ".12em", color: "#8a8069" }}>STATUS</div>
-                  <div style={{ fontFamily: DISPLAY, fontWeight: 700, fontSize: 20, marginTop: 2 }}>{p.label}</div>
-                </div>
-              );
-            }
-            return null;
-          })()}
           {wiki?.extract && (
-            <p style={{ fontFamily: SERIF, fontSize: 14.5, lineHeight: 1.6, color: "#4f4839", margin: 0, maxWidth: "70ch" }}>{wiki.extract}</p>
+            <p style={{ fontFamily: SERIF, fontSize: 14.5, lineHeight: 1.6, color: "#4f4839", margin: "16px 0 0", maxWidth: "70ch" }}>{wiki.extract}</p>
           )}
-          {!wiki?.extract && !curated && !r.population_summary && (
-            <p style={{ fontFamily: SERIF, fontSize: 14, lineHeight: 1.6, color: "#8a8069", margin: 0 }}>
+          {!wiki?.extract && !r.population_summary && (
+            <p style={{ fontFamily: SERIF, fontSize: 14, lineHeight: 1.6, color: "#8a8069", margin: "16px 0 0" }}>
               No Wikipedia summary found for <i>{r.scientific_name}</i>. Follow the IUCN link for the full assessment.
             </p>
           )}
+        </div>
+
+        {/* col 3 — projection box with abundance sparkline */}
+        <div className="detail-proj" style={{ background: "#16221b", borderRadius: 4, padding: "16px 17px", color: "#ece3d0" }}>
+          <div style={{ fontFamily: MONO, fontWeight: 700, fontSize: 9.5, letterSpacing: ".12em", color: boxKickerColor }}>{boxKicker}</div>
+          <div style={{ fontFamily: DISPLAY, fontWeight: 700, fontSize: boxBig.length > 9 ? 20 : 26, marginTop: 4, letterSpacing: "-.01em" }}>{boxBig}</div>
+          {boxNote && <div style={{ fontFamily: SERIF, fontSize: 12, lineHeight: 1.4, color: "rgba(236,227,208,.62)", marginTop: 3 }}>{boxNote}</div>}
+          <div style={{ fontFamily: MONO, fontWeight: 700, fontSize: 9.5, letterSpacing: ".12em", color: "rgba(236,227,208,.5)", marginTop: 15 }}>ABUNDANCE INDEX {measured ? "" : "(illustrative)"}</div>
+          <svg viewBox="0 0 176 46" style={{ width: "100%", height: "auto", marginTop: 5, display: "block" }}>
+            <polyline points={t.spark.obs} fill="none" stroke={t.color} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" opacity={measured ? 1 : 0.7} />
+            <polyline points={t.spark.proj} fill="none" stroke={t.color} strokeWidth={1.8} strokeDasharray="3 3" opacity={0.7} />
+          </svg>
         </div>
       </div>
     </div>

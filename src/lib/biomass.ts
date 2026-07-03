@@ -27,6 +27,7 @@ const ALL_LIFE: BiomassRow[] = [
   { label: "Archaea", v: 7, color: "#8a8069" },
   { label: "Protists", v: 4, color: "#b04e6f" },
   { label: "Animals (all)", v: 2, color: "#f04a26" },
+  { label: "Viruses", v: 0.2, color: "#8a8069" },
 ];
 
 // Mammals by biomass — the starkest cut. Cattle alone ≈ humans, and each is

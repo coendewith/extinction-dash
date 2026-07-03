@@ -16,7 +16,7 @@ export async function GET(req: NextRequest) {
       groups: csv("group"),
       country: sp.get("country") || undefined,
       measured: sp.get("measured") === "1",
-      sort: (sp.get("sort") as "severity" | "name" | "year") || "severity",
+      sort: (sp.get("sort") as "severity" | "name" | "year" | "extinction") || "severity",
       dir: (sp.get("dir") as "asc" | "desc") || undefined,
       page: sp.get("page") ? parseInt(sp.get("page")!, 10) : 1,
       pageSize: sp.get("pageSize") ? parseInt(sp.get("pageSize")!, 10) : 50,

@@ -26,7 +26,7 @@ export interface SearchParams {
   groups?: string[];
   country?: string;
   measured?: boolean;
-  sort?: "severity" | "name" | "year";
+  sort?: "severity" | "name" | "year" | "extinction";
   dir?: "asc" | "desc";
   page?: number;
   pageSize?: number;
@@ -70,10 +70,14 @@ export async function searchSpecies(p: SearchParams): Promise<SearchResult> {
     if (safe) params.set("or", `(scientific_name.ilike.*${safe}*,common_name.ilike.*${safe}*)`);
   }
 
+  // "extinction" sorts by the modelled risk window, which tracks the category's
+  // severity, so it maps to the severity column. Ascending = soonest projected
+  // extinction = most severe first, so the DB direction is flipped for it.
   const sortCol = p.sort === "name" ? "scientific_name" : p.sort === "year" ? "year_published" : "severity";
   const dir = p.dir || (p.sort === "name" ? "asc" : "desc");
+  const dbDir = p.sort === "extinction" ? (dir === "asc" ? "desc" : "asc") : dir;
   // stable secondary sort so pagination never repeats/skips rows
-  params.set("order", `${sortCol}.${dir}${dir === "desc" ? ".nullslast" : ".nullsfirst"},sis_id.asc`);
+  params.set("order", `${sortCol}.${dbDir}${dbDir === "desc" ? ".nullslast" : ".nullsfirst"},sis_id.asc`);
 
   const from = (page - 1) * pageSize;
   const to = from + pageSize - 1;
