@@ -220,6 +220,31 @@ Full refresh: `npm run harvest && npm run load` (species), then
   illustrative "Declining ·". Only a *null* trend falls back to category-derived.
 - Composes with category/group/country filters (e.g. measured + NL = 14 species).
 
+### Later fixes (append-only)
+
+- **RLS was silently OFF → table was anon-writable in production.** Policies do
+  nothing unless Row Level Security is *enabled* on the table. A temp-policy load
+  had left `species` with RLS disabled, so the public anon key could `UPDATE`/`DELETE`
+  any row (verified: an anon PATCH succeeded with 204 and actually changed data).
+  Fix: `alter table … enable row level security; … force row level security;` on
+  both `species` and `species_countries`. **Always verify after any bulk-load dance:**
+  an anon PATCH must return 0 rows changed (RLS filters the UPDATE to nothing), and
+  anon INSERT must 401. Don't trust the policy list alone — check `pg_class.relrowsecurity`.
+- **LPI sub-population spikes (split-by-system) were sparse-data artifacts.** The
+  amphibian "Land" sub-line rocketed to ~1472 (1970=100) because 1–2 populations
+  with big early year-on-year jumps dominated a thin sample, blowing up the whole
+  Y-axis. Fixed in `compute-lpi.py`: (1) tightened the per-population annual
+  log-ratio clamp to ±0.5 (~3×/yr), and (2) only move the index in years with
+  ≥ `YEAR_MIN_SPECIES` (8) contributing species, else hold flat. This also removed
+  the fake reptile +39% rise (now ~flat) — driver bullets updated to match.
+- **Common-name search + missing photos, same root cause.** DB `common_name` was
+  null for the bulk, so search matched only scientific names ("dolphin" → 0) and
+  Wikipedia image lookup (keyed on the binomial) missed species whose article
+  lives under the common name. `enrich-common.mjs` backfills common names for the
+  threatened+extinct tiers (~13.5k named) → `load-common.mjs`; the explorer now
+  falls back to the IUCN common name for the Wikipedia summary/photo. Full 88k
+  common-name coverage is still infeasible (per-species taxa calls).
+
 ### Review process note
 Before the public deploy, an adversarial review workflow (4 dimensions ×
 find→verify) surfaced 19 candidates, 9 confirmed and fixed (all above). It

@@ -41,6 +41,7 @@ BASE, OBS_END, PROJ_END = 1970, 2020, 2035
 # Below it, one or two populations can swing the index, so we stop the observed
 # line there and switch to a modelled projection.
 MIN_SPECIES = 3
+YEAR_MIN_SPECIES = 8  # a year needs this many contributing species to move the index
 
 GROUP_MAP = {
     "Mammalia": "Mammals", "Aves": "Birds", "Amphibia": "Amphibians", "Reptilia": "Reptiles",
@@ -125,11 +126,16 @@ def compute_index(species):
             pop_dts = []
             for s in pops:
                 if y in s and (y - 1) in s and s[y] > 0 and s[y - 1] > 0:
-                    pop_dts.append(max(-1.0, min(1.0, math.log10(s[y] / s[y - 1]))))
+                    # Cap a single population's year-on-year change at ~3x (log10 .5).
+                    # Looser than this lets one sparse early population spike the index.
+                    pop_dts.append(max(-0.5, min(0.5, math.log10(s[y] / s[y - 1]))))
             if pop_dts:
                 sp_dts.append(sum(pop_dts) / len(pop_dts))
         nsp_by_year[y] = len(sp_dts)
-        mean_dt = sum(sp_dts) / len(sp_dts) if sp_dts else 0.0
+        # Only move the index in years with an adequate sample; otherwise hold it
+        # flat. A year backed by 1–2 populations is noise, not a real trend, and
+        # is what produced the absurd early-year sub-population spikes.
+        mean_dt = (sum(sp_dts) / len(sp_dts)) if len(sp_dts) >= YEAR_MIN_SPECIES else 0.0
         val *= 10 ** mean_dt
         idx[y] = val
     # Observed window ends at the last adequately-sampled year.

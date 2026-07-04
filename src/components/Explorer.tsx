@@ -197,41 +197,58 @@ export default function Explorer({ curated }: { curated: Species[] }) {
   // lazy Wikipedia enrichment for the visible rows (image + common name + extract)
   useEffect(() => {
     let cancelled = false;
-    rows.forEach((r) => {
+
+    const summary = (title: string) =>
+      fetch("https://en.wikipedia.org/api/rest_v1/page/summary/" + encodeURIComponent(title.replace(/ /g, "_")))
+        .then((res) => (res.ok ? res.json() : null))
+        .catch(() => null);
+
+    // Trust a summary only if it plausibly matches THIS species — Wikipedia often
+    // redirects a binomial to a broader article (Sus bucculentus → "Wild boar").
+    const matchStrict = (j: any, sci: string) => {
+      if (!j || j.type === "disambiguation") return false;
+      const parts = sci.toLowerCase().split(/\s+/);
+      const genus = parts[0] || "", epithet = parts[1] || "";
+      const title = (j.title || "").toLowerCase();
+      const canon = (j.titles?.canonical || "").toLowerCase().replace(/_/g, " ");
+      const extract = (j.extract || "").toLowerCase();
+      const epithetRe = epithet ? new RegExp("\\b" + epithet.replace(/[.*+?^${}()|[\]\\]/g, "") + "\\b") : null;
+      return (
+        title === sci.toLowerCase() || canon === sci.toLowerCase() ||
+        (!!epithet && (extract.includes(genus + " " + epithet) || (!!epithetRe && epithetRe.test(extract))))
+      );
+    };
+
+    rows.forEach(async (r) => {
       const key = r.scientific_name;
       if (wiki[key]?.loaded) return;
-      fetch("https://en.wikipedia.org/api/rest_v1/page/summary/" + encodeURIComponent(key.replace(/ /g, "_")))
-        .then((res) => (res.ok ? res.json() : null))
-        .then((j) => {
-          if (cancelled) return;
-          const info: WikiInfo = { loaded: true };
-          // Wikipedia often redirects a scientific name to a broader article
-          // (e.g. Sus bucculentus → "Wild boar" / Sus scrofa). Only trust the
-          // result if it actually matches THIS species — the article title is the
-          // binomial, or the extract mentions the binomial / species epithet —
-          // otherwise we'd show the wrong animal's photo, name and text.
-          if (j && j.type !== "disambiguation") {
-            const parts = key.toLowerCase().split(/\s+/);
-            const genus = parts[0] || "", epithet = parts[1] || "";
-            const title = (j.title || "").toLowerCase();
-            const canon = (j.titles?.canonical || "").toLowerCase().replace(/_/g, " ");
-            const extract = (j.extract || "").toLowerCase();
-            const epithetRe = epithet ? new RegExp("\\b" + epithet.replace(/[.*+?^${}()|[\]\\]/g, "") + "\\b") : null;
-            const matches =
-              title === key.toLowerCase() ||
-              canon === key.toLowerCase() ||
-              (!!epithet && (extract.includes(genus + " " + epithet) || (!!epithetRe && epithetRe.test(extract))));
-            if (matches) {
-              info.title = j.title;
-              info.img = j.thumbnail?.source || j.originalimage?.source;
-              info.extract = j.extract;
-            }
+      const info: WikiInfo = { loaded: true };
+
+      // 1. by scientific name (validates species identity strictly)
+      const jSci = await summary(key);
+      if (matchStrict(jSci, key)) {
+        info.title = jSci.title;
+        info.img = jSci.thumbnail?.source || jSci.originalimage?.source;
+        info.extract = jSci.extract;
+      }
+
+      // 2. fall back to the IUCN common name — many species' articles live under
+      //    the common name and never redirect from the binomial, so a real photo
+      //    was being missed. The common name is authoritative (IUCN, for THIS
+      //    species), so accept its lead image when present.
+      if (!info.img && r.common_name) {
+        const jCn = await summary(r.common_name);
+        if (jCn && jCn.type !== "disambiguation") {
+          const img = jCn.thumbnail?.source || jCn.originalimage?.source;
+          if (img) {
+            info.img = img;
+            if (!info.title) info.title = jCn.title;
+            if (!info.extract) info.extract = jCn.extract;
           }
-          setWiki((prev) => ({ ...prev, [key]: info }));
-        })
-        .catch(() => {
-          if (!cancelled) setWiki((prev) => ({ ...prev, [key]: { loaded: true } }));
-        });
+        }
+      }
+
+      if (!cancelled) setWiki((prev) => ({ ...prev, [key]: info }));
     });
     return () => {
       cancelled = true;

@@ -64,8 +64,13 @@ async function fetchCommon(sci, tries = 0) {
 }
 
 async function main() {
+  // Process the charismatic, most-searched groups first (mammals/birds — dolphins,
+  // whales, eagles…) so common-name search becomes useful quickly, then the rest.
+  const PRIORITY = ["Mammals", "Birds", "Amphibians", "Reptiles", "Fish"];
+  const rank = (g) => { const i = PRIORITY.indexOf(g); return i === -1 ? PRIORITY.length : i; };
   const species = readFileSync(NDJSON, "utf8").split("\n").filter(Boolean).map((l) => JSON.parse(l))
-    .filter((s) => TIERS.includes(s.category) && !(s.sisId in map));
+    .filter((s) => TIERS.includes(s.category) && !(s.sisId in map))
+    .sort((a, b) => rank(a.group) - rank(b.group));
   log(`Common-name backfill: ${species.length} species in [${TIERS.join(", ")}] (have ${Object.keys(map).length})`);
 
   let i = 0, done = 0;

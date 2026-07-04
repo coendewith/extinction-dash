@@ -22,7 +22,7 @@ const NAV_LINKS = [
 // Change % is vs the 1970=100 baseline (from src/data/lpi.json, observed to 2020).
 const LPI_DRIVERS = [
   {
-    group: "Amphibians", color: "#f04a26", change: "−82% since 1970", dirColor: "#f04a26",
+    group: "Amphibians", color: "#f04a26", change: "−84% since 1970", dirColor: "#f04a26",
     text: "The steepest fall of any vertebrate class. Chytrid fungus (Batrachochytrium) has swept the tropics since the 1980s, on top of wetland drainage, agrochemical pollution and a drying climate.",
     sources: [
       { name: "Scheele et al. 2019, Science — amphibian chytrid panzootic", url: "https://www.science.org/doi/10.1126/science.aav0379" },
@@ -38,7 +38,7 @@ const LPI_DRIVERS = [
     ],
   },
   {
-    group: "Mammals", color: "#e3a63e", change: "−36% since 1970", dirColor: "#f04a26",
+    group: "Mammals", color: "#e3a63e", change: "−29% since 1970", dirColor: "#f04a26",
     text: "Habitat cleared for farming, plus hunting and the wildlife trade. Large-bodied mammals and populations outside protected areas have been hit hardest.",
     sources: [
       { name: "IPBES 2019 — Global Assessment (land-use change, exploitation)", url: "https://www.ipbes.net/global-assessment" },
@@ -52,8 +52,8 @@ const LPI_DRIVERS = [
     ],
   },
   {
-    group: "Reptiles", color: "#79bd6e", change: "+39% (sample artifact)", dirColor: "#cf8f34",
-    text: "The rise is a sampling artifact: reptiles are only 809 of the 34,000+ populations in this dataset (the Living Planet Database 2024), and that small sample skews toward well-monitored, recovering species such as protected marine turtles. The first global reptile assessment (Cox et al. 2022) found ~21% of reptile species are threatened.",
+    group: "Reptiles", color: "#79bd6e", change: "≈ flat (small sample)", dirColor: "#b9ae94",
+    text: "This line rests on just 809 of the 34,000+ populations in the dataset (the Living Planet Database 2024), skewed toward well-monitored species such as protected marine turtles — so the monitored average looks flat. The first global reptile assessment (Cox et al. 2022) found ~21% of reptile species are threatened with extinction.",
     sources: [
       { name: "Cox et al. 2022, Nature — global reptile assessment", url: "https://www.nature.com/articles/s41586-022-04664-7" },
       { name: "Living Planet Database 2024 (this dataset — 809 reptile populations)", url: "https://www.livingplanetindex.org/" },
