@@ -41,7 +41,11 @@ BASE, OBS_END, PROJ_END = 1970, 2020, 2035
 # Below it, one or two populations can swing the index, so we stop the observed
 # line there and switch to a modelled projection.
 MIN_SPECIES = 3
-YEAR_MIN_SPECIES = 8  # a year needs this many contributing species to move the index
+YEAR_MIN_SPECIES = 12  # a year needs this many contributing species to move the index
+# (12 not 8: at the thinning tail of a sub-population line, a year backed by ~11
+# species — some pinned at the smoothing cap — could still freeze an implausible
+# terminal spike into the modelled window, e.g. freshwater amphibians 39->63 in
+# 2014. 12 removes that while leaving every main class curve unchanged.)
 
 GROUP_MAP = {
     "Mammalia": "Mammals", "Aves": "Birds", "Amphibia": "Amphibians", "Reptilia": "Reptiles",
