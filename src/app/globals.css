@@ -59,12 +59,19 @@ a {
   border-color: rgba(240, 74, 38, 0.6) !important;
 }
 
-/* ---- Watchlist table: responsive column grid + sticky header ---- */
+/* ---- Watchlist table: sticky header on desktop, horizontal scroll on mobile ---- */
 .wl-card {
   background: #f6f0e2;
   border: 1px solid rgba(27, 24, 19, 0.18);
   border-radius: 4px;
   margin-top: 16px;
+}
+/* Desktop: no scroll wrapper clipping, so the header can stick to the viewport. */
+.wl-scroll {
+  overflow: visible;
+}
+.wl-inner {
+  min-width: 0;
 }
 .wl-grid {
   display: grid;
@@ -88,51 +95,21 @@ a {
   cursor: pointer;
 }
 
-@media (max-width: 1180px) {
-  .wl-grid {
-    grid-template-columns: 34px minmax(140px, 1fr) 76px 74px 96px 156px 118px 24px;
+/* Below the table's natural width, keep EVERY column and let the whole table
+   scroll horizontally (swipe) rather than hiding data. A horizontal scroll
+   container can't also host a viewport-sticky header, so the header becomes
+   static here and scrolls with the columns (staying aligned). */
+@media (max-width: 920px) {
+  .wl-scroll {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
   }
-  .wl-c-assessed {
-    display: none !important;
+  .wl-inner {
+    min-width: 900px;
   }
-}
-@media (max-width: 1000px) {
-  .wl-grid {
-    grid-template-columns: 34px minmax(130px, 1fr) 74px 94px 150px 116px 24px;
-  }
-  .wl-c-assessed,
-  .wl-c-group {
-    display: none !important;
-  }
-}
-@media (max-width: 840px) {
-  .wl-grid {
-    grid-template-columns: 32px minmax(120px, 1fr) 70px 140px 108px 22px;
-  }
-  .wl-c-assessed,
-  .wl-c-group,
-  .wl-c-pop {
-    display: none !important;
-  }
-}
-@media (max-width: 660px) {
-  .wl-grid {
-    grid-template-columns: 26px minmax(90px, 1fr) 58px 108px 20px;
-    gap: 9px;
-  }
-  .wl-c-assessed,
-  .wl-c-group,
-  .wl-c-pop,
-  .wl-c-trend {
-    display: none !important;
-  }
-  .wl-head,
-  .wl-row {
-    padding-left: 13px;
-    padding-right: 13px;
-  }
-  .wl-spark {
-    display: none;
+  .wl-head {
+    position: static;
+    box-shadow: none;
   }
 }
 
@@ -179,12 +156,5 @@ a {
   .biomass-label {
     width: 116px !important;
     font-size: 12px !important;
-  }
-}
-
-@media (max-width: 430px) {
-  .wl-grid {
-    grid-template-columns: 22px minmax(70px, 1fr) 52px 96px 18px;
-    gap: 7px;
   }
 }

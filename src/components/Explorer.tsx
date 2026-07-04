@@ -421,8 +421,10 @@ export default function Explorer({ curated }: { curated: Species[] }) {
           </div>
         )}
 
-        {/* table */}
+        {/* table — scrolls horizontally on small screens so the full row stays viewable */}
         <div className="wl-card">
+         <div className="wl-scroll">
+          <div className="wl-inner">
           <div className="wl-head wl-grid">
             <div style={H}>#</div>
             <SortHead label="SPECIES" active={sort === "name"} dir={dir} onClick={() => clickSort("name")} />
@@ -518,6 +520,8 @@ export default function Explorer({ curated }: { curated: Species[] }) {
           {!loading && rows.length === 0 && configured && (
             <div style={{ padding: "34px 22px", textAlign: "center", fontFamily: SERIF, color: "#8a8069", fontSize: 15, borderTop: "1px solid rgba(27,24,19,.09)" }}>No species match these filters.</div>
           )}
+          </div>
+         </div>
         </div>
 
         {/* pagination */}
