@@ -215,9 +215,17 @@ export default function Explorer({ curated }: { curated: Species[] }) {
       const epithetRe = epithet ? new RegExp("\\b" + epithet.replace(/[.*+?^${}()|[\]\\]/g, "") + "\\b") : null;
       return (
         title === sci.toLowerCase() || canon === sci.toLowerCase() ||
-        (!!epithet && (extract.includes(genus + " " + epithet) || (!!epithetRe && epithetRe.test(extract))))
+        // full binomial in the extract, OR the epithet AND genus both present —
+        // a bare epithet alone ("elegans", "gracilis") matches too many wrong
+        // articles, so require the genus too.
+        (!!epithet && (extract.includes(genus + " " + epithet) ||
+          (!!epithetRe && epithetRe.test(extract) && extract.includes(genus))))
       );
     };
+    // Reject a higher-taxon article (a genus/family/order page) — its lead photo
+    // is some other member, not this species.
+    const isHigherTaxon = (j: any) =>
+      /\bis (a|an) (genus|family|order|class|subfamily|tribe|clade|group) of\b/i.test(j?.extract || "");
 
     rows.forEach(async (r) => {
       const key = r.scientific_name;
@@ -238,7 +246,7 @@ export default function Explorer({ curated }: { curated: Species[] }) {
       //    species), so accept its lead image when present.
       if (!info.img && r.common_name) {
         const jCn = await summary(r.common_name);
-        if (jCn && jCn.type !== "disambiguation") {
+        if (jCn && jCn.type !== "disambiguation" && !isHigherTaxon(jCn)) {
           const img = jCn.thumbnail?.source || jCn.originalimage?.source;
           if (img) {
             info.img = img;

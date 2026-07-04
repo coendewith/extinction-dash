@@ -194,17 +194,20 @@ export default function Dashboard({
               FIELD RECORD
             </span>
           </a>
-          <div className="nav-links" style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: 26 }}>
-            {NAV_LINKS.map(([href, label]) => (
-              <a
-                key={href}
-                href={href}
-                className="navlink"
-                style={{ fontFamily: MONO, fontSize: 11, letterSpacing: ".12em", textTransform: "uppercase", color: "rgba(236,227,208,.6)", textDecoration: "none" }}
-              >
-                {label}
-              </a>
-            ))}
+          <div style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: 26 }}>
+            <div className="nav-links" style={{ display: "flex", alignItems: "center", gap: 26 }}>
+              {NAV_LINKS.map(([href, label]) => (
+                <a
+                  key={href}
+                  href={href}
+                  className="navlink"
+                  style={{ fontFamily: MONO, fontSize: 11, letterSpacing: ".12em", textTransform: "uppercase", color: "rgba(236,227,208,.6)", textDecoration: "none" }}
+                >
+                  {label}
+                </a>
+              ))}
+            </div>
+            {/* LIVE/SNAPSHOT badge stays visible on mobile (outside .nav-links) */}
             <span
               title={live ? "Statuses synced live from the IUCN Red List API" : "Showing the last built snapshot"}
               style={{ display: "inline-flex", alignItems: "center", gap: 6, fontFamily: MONO, fontSize: 9.5, letterSpacing: ".12em", color: live ? "#8fd0c4" : "rgba(236,227,208,.4)" }}

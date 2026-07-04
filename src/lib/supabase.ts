@@ -52,13 +52,17 @@ export async function searchSpecies(p: SearchParams): Promise<SearchResult> {
   if (!URL || !KEY) return { rows: [], total: 0, page, pageSize, configured: false };
 
   const params = new URLSearchParams();
+  // Only honour a valid ISO-3166 alpha-2 code. A malformed code (e.g. "NLD")
+  // must be ignored entirely — otherwise adding the inner-join without the
+  // matching filter silently returns every species that has ANY country record.
   const country = (p.country || "").trim().toUpperCase();
+  const validCountry = /^[A-Z]{2}$/.test(country) ? country : "";
   // When a country is selected, inner-join the occurrence table so only species
   // recorded in that country come back.
   const select = "sis_id,scientific_name,common_name,group_name,category,severity,possibly_extinct,population_trend,population_size,population_summary,year_published,url" +
-    (country ? ",species_countries!inner(country_code)" : "");
+    (validCountry ? ",species_countries!inner(country_code)" : "");
   params.set("select", select);
-  if (country && /^[A-Z]{2}$/.test(country)) params.set("species_countries.country_code", "eq." + country);
+  if (validCountry) params.set("species_countries.country_code", "eq." + validCountry);
 
   if (p.categories?.length) params.set("category", "in." + inList(p.categories));
   if (p.groups?.length) params.set("group_name", "in." + inList(p.groups));
@@ -87,7 +91,8 @@ export async function searchSpecies(p: SearchParams): Promise<SearchResult> {
   };
   const sortCol = SORT_COL[p.sort || "severity"] || "severity";
   const defaultDir = p.sort === "name" || p.sort === "group" || p.sort === "trend" || p.sort === "extinction" ? "asc" : "desc";
-  const dir = p.dir || defaultDir;
+  // Never pass an arbitrary dir straight to PostgREST (it 400s on anything but asc/desc).
+  const dir = p.dir === "asc" || p.dir === "desc" ? p.dir : defaultDir;
   const dbDir = p.sort === "extinction" ? (dir === "asc" ? "desc" : "asc") : dir;
   // stable secondary sort so pagination never repeats/skips rows
   params.set("order", `${sortCol}.${dbDir}${dbDir === "desc" ? ".nullslast" : ".nullsfirst"},sis_id.asc`);
@@ -108,6 +113,13 @@ export async function searchSpecies(p: SearchParams): Promise<SearchResult> {
     next: { revalidate: 300 },
   });
   if (!res.ok) {
+    // 416 = requested a page past the end. That's not an error — return an empty
+    // page (still configured), with the real total from the Content-Range header.
+    if (res.status === 416) {
+      const cr = res.headers.get("content-range") || "";
+      const total = parseInt(cr.split("/")[1] || "0", 10) || 0;
+      return { rows: [], total, page, pageSize, configured: true };
+    }
     const text = await res.text().catch(() => "");
     throw new Error(`Supabase ${res.status}: ${text.slice(0, 200)}`);
   }
